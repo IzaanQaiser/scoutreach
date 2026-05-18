@@ -671,3 +671,5 @@ Every engineering decision should favor:
 * speed of iteration
 * maintainability
   over complexity or theoretical scalability.
+
+  Follow commit and PR standards defined in /docs/GIT_WORKFLOW.md

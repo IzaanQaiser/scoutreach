@@ -1,3 +1,6 @@
+FIRST READ:
+/docs/MASTER_CONTEXT.md
+
 Before coding:
 1. Read brief.md
 2. Read architecture.md
@@ -15,3 +18,19 @@ Rules:
 - Prefer explicit, boring code.
 - If unclear, leave a TODO and make the safest minimal assumption.
 - After changes, summarize files changed and tests run.
+
+Do not add dependencies unless:
+- required for core functionality
+- no lightweight native alternative exists
+- dependency is actively maintained
+- dependency significantly reduces implementation complexity
+
+Do not refactor working code unless:
+- bug exists
+- duplication is severe
+- architecture is blocked
+- requested explicitly
+
+Follow commit and PR standards defined in /docs/GIT_WORKFLOW.md
+
+The rules in /docs/SYSTEM_INVARIANTS.md must NEVER break unless explicitly redesigned
