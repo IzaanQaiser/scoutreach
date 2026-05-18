@@ -14,6 +14,7 @@ This file defines:
 - project purpose
 - architectural philosophy
 - required reading order
+- canonical markdown map
 - documentation responsibilities
 - update rules
 - engineering constraints
@@ -59,9 +60,46 @@ ScoutReach intentionally avoids:
 
 ---
 
+# Document Precedence (If Docs Conflict)
+
+If two docs conflict, follow this order (highest first):
+
+1. `/agents.md`
+2. `/docs/system_invariants.md`
+3. `/docs/master_context.md`
+4. `/docs/api_contracts.md`, `/docs/db_schema.md`, `/docs/architecture.md`
+5. `/docs/development_standards.md`, `/docs/codex_rules.md`
+6. `/docs/brief.md`, `/docs/mvp_scope.md`
+7. `/docs/commands.md`, `/docs/testing.md`, `/docs/git_workflow.md`, `/docs/task_template.md`
+8. `/docs/decisions.md`, `/docs/known_gaps.md`
+
+If conflict still exists:
+- make the safest minimal assumption
+- add a TODO in code
+- log the conflict in `/docs/known_gaps.md`
+- request clarification in the task summary
+
+---
+
 # Required Reading Order
 
 AI coding agents MUST read documents in this order before implementing changes.
+
+## 0. Entry + Global Constraints
+
+### `/docs/master_context.md`
+Purpose:
+- canonical index and reading order
+- precedence and conflict resolution
+- required post-task output format
+
+### `/agents.md`
+Purpose:
+- root-level task constraints for coding agents
+- mandatory pre-coding reading requirements
+- implementation guardrails
+
+---
 
 ## 1. Product + Scope
 
@@ -79,7 +117,7 @@ Purpose:
 
 ---
 
-## 2. Architecture
+## 2. Architecture + Contracts
 
 ### `/docs/architecture.md`
 Purpose:
@@ -103,6 +141,13 @@ Purpose:
 - request/response expectations
 - frontend/backend contracts
 
+### `/docs/system_invariants.md`
+Purpose:
+- defines architectural truths that must NEVER break
+- defines ownership guarantees
+- defines lifecycle guarantees
+- defines sending and review guarantees
+
 ---
 
 ## 3. Engineering Rules
@@ -118,14 +163,11 @@ Purpose:
 
 This document defines HOW code should be written.
 
-### `/docs/system_invariants.md`
+### `/docs/codex_rules.md`
 Purpose:
-- defines architectural truths that must NEVER break
-- defines ownership guarantees
-- defines lifecycle guarantees
-- defines sending and review guarantees
-
-This document defines WHAT must always remain true.
+- Codex-specific operating constraints
+- implementation behavior expectations
+- repository quality guardrails
 
 ---
 
@@ -148,6 +190,11 @@ Purpose:
 - commit conventions
 - branch naming
 - PR standards
+
+### `/docs/task_template.md`
+Purpose:
+- standard task execution and reporting template
+- consistent implementation/test/doc summaries
 
 ---
 
@@ -176,6 +223,32 @@ MUST be updated whenever:
 - shortcuts are taken
 - temporary implementations are added
 - missing functionality is discovered
+
+---
+
+# Complete Markdown Map (Authoritative)
+
+This section MUST include every tracked markdown file in the repo.
+
+- `/agents.md`
+- `/docs/master_context.md`
+- `/docs/brief.md`
+- `/docs/mvp_scope.md`
+- `/docs/architecture.md`
+- `/docs/db_schema.md`
+- `/docs/api_contracts.md`
+- `/docs/system_invariants.md`
+- `/docs/development_standards.md`
+- `/docs/codex_rules.md`
+- `/docs/commands.md`
+- `/docs/testing.md`
+- `/docs/git_workflow.md`
+- `/docs/task_template.md`
+- `/docs/decisions.md`
+- `/docs/known_gaps.md`
+
+Maintenance rule:
+- if any `.md` file is added, removed, or renamed, update this section in the same change.
 
 ---
 
@@ -222,6 +295,7 @@ If architecture or behavior changes:
 - update diagrams if necessary
 - update decisions.md
 - update known_gaps.md if needed
+- update the markdown map in `/docs/master_context.md` if doc files changed
 
 Documentation is part of the codebase.
 
