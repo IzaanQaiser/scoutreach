@@ -301,6 +301,28 @@ Documentation is part of the codebase.
 
 ---
 
+## Public Release Limit-Safety Discipline
+
+For public release readiness, request distribution protections are mandatory for:
+- message sending
+- AI generation
+- enrichment/provider calls
+
+Minimum required approach:
+- asynchronous jobs for bulk operations (no synchronous request fan-out from user actions)
+- layered throttling:
+  - per-user quotas
+  - per-provider quotas
+  - per-operation throttles
+- retry policy with exponential backoff + jitter for 429/5xx and timeouts
+- idempotency keys for send operations to prevent duplicate outbound messages
+- queue fairness so one heavy user cannot starve other users
+- bounded concurrency with safe defaults documented in code/config
+
+Do not release public sending flows that lack the above controls.
+
+---
+
 # Required Post-Task Output
 
 After completing a task, AI agents should summarize:

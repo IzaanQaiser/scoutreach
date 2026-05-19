@@ -18,6 +18,12 @@ Rules:
 - Prefer explicit, boring code.
 - If unclear, leave a TODO and make the safest minimal assumption.
 - After changes, summarize files changed and tests run.
+- For any public-release sending/enrichment/generation work, enforce provider-safe request distribution:
+  - async jobs instead of synchronous fan-out
+  - per-user quotas
+  - provider-level throttling (Gemini/Hunter/Gmail and future providers)
+  - exponential backoff with jitter on 429/5xx
+  - idempotency for send operations to avoid duplicates
 
 Do not add dependencies unless:
 - required for core functionality
