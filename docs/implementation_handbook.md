@@ -274,3 +274,161 @@ Practical rule:
 - make safest minimal assumption
 - leave TODO and call out conflict in summary
 
+---
+
+# 15. Phased Implementation Checklist (Strict Gates)
+
+Use this as the execution plan. Do not move to the next phase until the current phase is fully green.
+
+Global gate for every phase:
+- implement only that phase scope
+- preserve existing behavior
+- keep statuses/contracts aligned with docs
+- update docs when behavior/contracts change
+- run required tests before phase sign-off
+
+## Phase 1: Foundations
+
+Scope:
+- repo/app skeleton readiness
+- FastAPI app shell
+- Supabase connection setup
+- authentication baseline
+- DB schema/migrations for core tables
+
+Acceptance criteria:
+- backend starts cleanly and `/health` returns success
+- core tables exist (`users`, `candidate_profile`, `runs`, `companies`, `outreach`)
+- auth middleware exists and protects authenticated routes
+- schema includes required ownership keys and timestamps
+
+Done tests:
+- backend smoke: server boot + health endpoint
+- integration: authenticated request succeeds, unauthenticated request fails
+- integration: migration creates required tables/constraints
+
+## Phase 2: Runs + Scraping Persistence
+
+Scope:
+- create run flow
+- run status polling flow
+- scraper integration entrypoint
+- company persistence per run
+
+Acceptance criteria:
+- `POST /runs` creates run with valid initial status/progress
+- `GET /runs/{run_id}/status` returns current status/progress/error fields
+- scraper output is normalized and stored under the correct `run_id`
+- failed single-company scrape does not crash the full run
+
+Done tests:
+- integration: run creation under quota and rejection over quota
+- integration: ownership checks for run reads
+- integration: company rows persist with correct `run_id`
+- integration: partial scrape failure preserves run continuity
+
+## Phase 3: Dossier + Enrichment
+
+Scope:
+- Gemini dossier generation
+- Hunter founder email enrichment
+- persistence of success/failure metadata
+
+Acceptance criteria:
+- each persisted company has raw scrape plus dossier or explicit dossier failure state
+- Hunter lookup results are stored on founder objects when available
+- no-email/lookup-failure companies remain reviewable
+- provider failures are logged and stored without collapsing the run
+
+Done tests:
+- unit: dossier parsing/validation logic
+- integration: Gemini timeout/failure sets failure state correctly
+- integration: Hunter empty/failure path still persists company as reviewable
+- integration: provider error path stores error_message/log data
+
+## Phase 4: Company Review (Swipe)
+
+Scope:
+- review queue retrieval
+- accept/reject state updates
+- pending count endpoint
+- swipe UI wiring
+
+Acceptance criteria:
+- `GET /runs/{run_id}/companies?status=pending_review` returns review queue
+- `PATCH /companies/{company_id}` supports allowed transitions
+- `GET /runs/{run_id}/companies/pending-count` is accurate
+- users cannot modify other users' company rows
+
+Done tests:
+- integration: pending queue returns only owned run data
+- integration: accept/reject updates persist correctly
+- integration: invalid transitions are rejected
+- frontend behavior: swipe actions trigger correct API calls and state updates
+
+## Phase 5: Outreach Generation
+
+Scope:
+- generate outreach for accepted companies
+- draft persistence in `outreach`
+- generation failure handling
+
+Acceptance criteria:
+- `POST /runs/{run_id}/generate-messages` enforces quota before generation
+- draft outreach rows are created with correct ownership/run/company linkage
+- generation failures create `generation_failed` rows with error context
+- run status moves to messages-generated state after generation cycle
+
+Done tests:
+- integration: accepted-only companies are used for generation
+- integration: generated drafts contain required fields/status
+- integration: generation failure path persists `generation_failed`
+- integration: ownership and quota checks block unauthorized/over-limit requests
+
+## Phase 6: Review, Regenerate, Send
+
+Scope:
+- outreach review/update endpoints
+- regenerate endpoint with critique
+- send-approved flow via Gmail
+- sent/failed state persistence
+
+Acceptance criteria:
+- users can edit/approve/reject/needs_review drafts they own
+- regenerate keeps ownership/history safe and preserves prior draft on failure
+- send flow only sends `approved` rows
+- send results persist per-row success/failure and timestamps
+
+Done tests:
+- integration: `PATCH /outreach/{id}` allows only permitted states
+- integration: regenerate success and failure paths behave correctly
+- integration: send-approved enforces ownership, quota, and approved-only rule
+- integration: Gmail failure marks row failed without crashing batch send
+
+## Phase 7: Public Beta Hardening
+
+Scope:
+- rate-limit and quota hardening
+- error handling polish and observability
+- public-release safety controls
+- final QA pass
+
+Acceptance criteria:
+- quotas enforced for run create, generation, regeneration, and send
+- limit-safety protections exist for high-volume provider usage
+- logs include critical state transitions and failure reasons
+- public behavior keeps manual review before sending by default
+
+Done tests:
+- integration: quota rejection does not partially mutate send/generation state
+- integration: retry/backoff/throttle behavior for simulated 429/5xx provider errors
+- smoke: end-to-end happy path (start run -> review -> generate -> approve -> send)
+- regression: key ownership and invariants still hold across core flows
+
+## Phase Completion Protocol
+
+To mark a phase complete:
+- all phase acceptance criteria are true
+- all phase done tests pass
+- required docs are updated if behavior/contracts changed
+- task output includes: files changed, implementation summary, tests run, and known gaps
