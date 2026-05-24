@@ -70,7 +70,7 @@ If two docs conflict, follow this order (highest first):
 4. `/docs/api_contracts.md`, `/docs/db_schema.md`, `/docs/architecture.md`
 5. `/docs/development_standards.md`, `/docs/codex_rules.md`
 6. `/docs/brief.md`, `/docs/mvp_scope.md`
-7. `/docs/commands.md`, `/docs/testing.md`, `/docs/git_workflow.md`, `/docs/task_template.md`
+7. `/docs/implementation_handbook.md`, `/docs/commands.md`, `/docs/testing.md`, `/docs/git_workflow.md`, `/docs/task_template.md`
 8. `/docs/decisions.md`, `/docs/known_gaps.md`
 
 If conflict still exists:
@@ -86,6 +86,12 @@ If conflict still exists:
 AI coding agents MUST read documents in this order before implementing changes.
 
 ## 0. Entry + Global Constraints
+
+### `/docs/implementation_handbook.md`
+Purpose:
+- single-link implementation rules summary
+- consolidated engineering/testing/git/documentation standards
+- quick operating brief for coding sessions
 
 ### `/docs/master_context.md`
 Purpose:
@@ -240,6 +246,7 @@ This section MUST include every tracked markdown file in the repo.
 - `/docs/system_invariants.md`
 - `/docs/development_standards.md`
 - `/docs/codex_rules.md`
+- `/docs/implementation_handbook.md`
 - `/docs/commands.md`
 - `/docs/testing.md`
 - `/docs/git_workflow.md`

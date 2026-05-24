@@ -1,6 +1,9 @@
 FIRST READ:
 /docs/MASTER_CONTEXT.md
 
+Single-link implementation briefing:
+/docs/implementation_handbook.md
+
 Before coding:
 1. Read brief.md
 2. Read architecture.md
