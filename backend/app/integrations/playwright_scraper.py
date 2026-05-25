@@ -1,7 +1,7 @@
-"""Phase 2 scraper integration entrypoint.
+"""Phase 2/3 scraper integration entrypoint.
 
-This intentionally returns deterministic mock scrape outputs for now.
-Actual Playwright network scraping is deferred to a later phase.
+This remains deterministic for local/test behavior.
+Real Playwright network scraping is deferred.
 """
 
 from __future__ import annotations
@@ -24,14 +24,14 @@ class ScrapedCompany:
 
 
 class PlaywrightYcScraper:
-    """Stub scraper contract for Phase 2 pipeline wiring."""
+    """Stub scraper contract for pipeline wiring."""
 
     def scrape_batches(self, selected_batches: list[str]) -> Iterable[ScrapedCompany]:
         for batch in selected_batches:
             normalized_batch = batch.strip().upper()
             slug = normalized_batch.lower().replace(" ", "-")
 
-            # Inject one controlled partial failure path for testing and resiliency validation.
+            # Controlled partial scrape failure path.
             if normalized_batch == "FAIL_ONE":
                 yield ScrapedCompany(
                     batch=normalized_batch,
@@ -44,6 +44,42 @@ class PlaywrightYcScraper:
                     scrape_failed=True,
                     failure_reason="Simulated company scrape failure.",
                 )
+
+            if normalized_batch == "DOSSIER_FAIL":
+                yield ScrapedCompany(
+                    batch=normalized_batch,
+                    name=f"Dossier-Fail {normalized_batch} Labs",
+                    yc_url=f"https://www.ycombinator.com/companies/dossier-fail-{slug}",
+                    website_url=f"https://dossier-fail-{slug}.com",
+                    domain=f"dossier-fail-{slug}.com",
+                    founders=[{"name": f"Founder {normalized_batch}"}],
+                    raw_scraped_data={"source": "phase_stub", "batch": normalized_batch},
+                )
+                continue
+
+            if normalized_batch == "HUNTER_EMPTY":
+                yield ScrapedCompany(
+                    batch=normalized_batch,
+                    name=f"Hunter Empty {normalized_batch} Labs",
+                    yc_url=f"https://www.ycombinator.com/companies/hunter-empty-{slug}",
+                    website_url=f"https://hunter-empty-{slug}.com",
+                    domain=f"hunter-empty-{slug}.com",
+                    founders=[{"name": f"Founder {normalized_batch}"}],
+                    raw_scraped_data={"source": "phase_stub", "batch": normalized_batch},
+                )
+                continue
+
+            if normalized_batch == "HUNTER_ERROR":
+                yield ScrapedCompany(
+                    batch=normalized_batch,
+                    name=f"Hunter Error {normalized_batch} Labs",
+                    yc_url=f"https://www.ycombinator.com/companies/hunter-error-{slug}",
+                    website_url=f"https://hunter-error-{slug}.com",
+                    domain=f"hunter-error-{slug}.com",
+                    founders=[{"name": f"Founder {normalized_batch}"}],
+                    raw_scraped_data={"source": "phase_stub", "batch": normalized_batch},
+                )
+                continue
 
             yield ScrapedCompany(
                 batch=normalized_batch,
@@ -58,8 +94,7 @@ class PlaywrightYcScraper:
                     }
                 ],
                 raw_scraped_data={
-                    "source": "phase2_stub",
+                    "source": "phase_stub",
                     "batch": normalized_batch,
                 },
             )
-

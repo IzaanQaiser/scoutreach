@@ -69,6 +69,10 @@ class RunRepository(ABC):
     def count_companies_for_run_by_status(self, *, run_id: str, status: str) -> int:
         raise NotImplementedError
 
+    @abstractmethod
+    def get_companies_for_run(self, *, run_id: str) -> list[dict]:
+        raise NotImplementedError
+
 
 class InMemoryRunRepository(RunRepository):
     def __init__(self) -> None:
@@ -176,6 +180,10 @@ class InMemoryRunRepository(RunRepository):
                 for company in self._companies
             )
 
+    def get_companies_for_run(self, *, run_id: str) -> list[dict]:
+        with self._lock:
+            return [dict(company) for company in self._companies if company["run_id"] == run_id]
+
 
 def _rows(response: object) -> list[dict]:
     if hasattr(response, "data"):
@@ -281,3 +289,7 @@ class SupabaseRunRepository(RunRepository):
             self._client.table("companies").select("id").eq("run_id", run_id).eq("status", status).execute()
         )
         return len(rows)
+
+    def get_companies_for_run(self, *, run_id: str) -> list[dict]:
+        rows = _rows(self._client.table("companies").select("*").eq("run_id", run_id).execute())
+        return [dict(row) for row in rows]

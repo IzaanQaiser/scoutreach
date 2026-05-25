@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from app.models.statuses import RUN_STATUS_COMPLETED, RUN_STATUS_COMPLETED_WITH_ERRORS, RUN_STATUS_SCRAPING
+from app.models.statuses import (
+    RUN_STATUS_COMPLETED,
+    RUN_STATUS_COMPLETED_WITH_ERRORS,
+    RUN_STATUS_DOSSIER_GENERATING,
+    RUN_STATUS_ENRICHING,
+    RUN_STATUS_SCRAPING,
+)
 
 
 AUTH_HEADERS = {"Authorization": "Bearer local-dev-token"}
@@ -31,7 +37,12 @@ def test_create_run_and_status_polling_flow(client: TestClient) -> None:
 
     status_payload = status_response.json()["data"]
     assert status_payload["run_id"] == run_id
-    assert status_payload["status"] in {RUN_STATUS_SCRAPING, RUN_STATUS_COMPLETED}
+    assert status_payload["status"] in {
+        RUN_STATUS_SCRAPING,
+        RUN_STATUS_DOSSIER_GENERATING,
+        RUN_STATUS_ENRICHING,
+        RUN_STATUS_COMPLETED,
+    }
     assert status_payload["companies_scraped"] >= 1
 
 
@@ -78,4 +89,3 @@ def test_partial_scrape_failure_does_not_fail_run(client: TestClient) -> None:
     status_payload = status_response.json()["data"]
     assert status_payload["status"] == RUN_STATUS_COMPLETED_WITH_ERRORS
     assert status_payload["companies_scraped"] == 3
-

@@ -12,6 +12,8 @@ from app.api.routes.me import router as me_router
 from app.api.routes.runs import router as runs_router
 from app.db.run_repository import InMemoryRunRepository, SupabaseRunRepository
 from app.db.supabase_client import build_supabase_client
+from app.integrations.gemini_client import GeminiDossierClient
+from app.integrations.hunter_client import HunterEmailClient
 from app.integrations.playwright_scraper import PlaywrightYcScraper
 from app.middleware.errors import register_error_handlers
 from app.services.run_service import RunService
@@ -29,9 +31,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         run_repository = SupabaseRunRepository(app.state.supabase_client)
     app.state.run_repository = run_repository
     app.state.scraper = PlaywrightYcScraper()
+    app.state.gemini_client = GeminiDossierClient()
+    app.state.hunter_client = HunterEmailClient()
     app.state.run_service = RunService(
         repository=run_repository,
         scraper=app.state.scraper,
+        gemini_client=app.state.gemini_client,
+        hunter_client=app.state.hunter_client,
     )
     yield
 
