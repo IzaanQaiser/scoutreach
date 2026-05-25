@@ -9,8 +9,12 @@ from fastapi import FastAPI
 
 from app.api.routes.health import router as health_router
 from app.api.routes.me import router as me_router
+from app.api.routes.runs import router as runs_router
+from app.db.run_repository import InMemoryRunRepository, SupabaseRunRepository
 from app.db.supabase_client import build_supabase_client
+from app.integrations.playwright_scraper import PlaywrightYcScraper
 from app.middleware.errors import register_error_handlers
+from app.services.run_service import RunService
 from app.utils.settings import load_settings
 
 
@@ -19,6 +23,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = load_settings()
     app.state.settings = settings
     app.state.supabase_client = build_supabase_client(settings)
+    if settings.environment == "test":
+        run_repository = InMemoryRunRepository()
+    else:
+        run_repository = SupabaseRunRepository(app.state.supabase_client)
+    app.state.run_repository = run_repository
+    app.state.scraper = PlaywrightYcScraper()
+    app.state.run_service = RunService(
+        repository=run_repository,
+        scraper=app.state.scraper,
+    )
     yield
 
 
@@ -33,6 +47,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(me_router)
+    app.include_router(runs_router)
 
     return app
 

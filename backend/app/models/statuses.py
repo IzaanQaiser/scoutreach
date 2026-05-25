@@ -1,0 +1,33 @@
+"""Centralized status constants for ScoutReach domain entities."""
+
+from __future__ import annotations
+
+RUN_STATUS_QUEUED = "queued"
+RUN_STATUS_RUNNING = "running"
+RUN_STATUS_SCRAPING = "scraping"
+RUN_STATUS_ENRICHING = "enriching"
+RUN_STATUS_DOSSIER_GENERATING = "dossier_generating"
+RUN_STATUS_COMPLETED = "completed"
+RUN_STATUS_COMPLETED_WITH_ERRORS = "completed_with_errors"
+RUN_STATUS_FAILED = "failed"
+RUN_STATUS_MESSAGES_GENERATING = "messages_generating"
+RUN_STATUS_MESSAGES_GENERATED = "messages_generated"
+RUN_STATUS_SENDING = "sending"
+
+RUN_ACTIVE_STATUSES = {
+    RUN_STATUS_QUEUED,
+    RUN_STATUS_RUNNING,
+    RUN_STATUS_SCRAPING,
+    RUN_STATUS_ENRICHING,
+    RUN_STATUS_DOSSIER_GENERATING,
+    RUN_STATUS_MESSAGES_GENERATING,
+    RUN_STATUS_SENDING,
+}
+
+COMPANY_STATUS_PENDING_REVIEW = "pending_review"
+COMPANY_STATUS_ACCEPTED = "accepted"
+COMPANY_STATUS_REJECTED = "rejected"
+COMPANY_STATUS_DOSSIER_FAILED = "dossier_failed"
+COMPANY_STATUS_SCRAPE_FAILED = "scrape_failed"
+COMPANY_STATUS_EMAIL_LOOKUP_FAILED = "email_lookup_failed"
+
