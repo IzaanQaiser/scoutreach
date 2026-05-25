@@ -60,3 +60,21 @@ Decision:
 
 Reason:
 Implements required Phase 2 behavior with minimal architecture overhead, consistent with MVP-first and explicit-flow constraints.
+
+---
+
+## 2026-05-25
+Decision:
+Phase 3 adds explicit provider modules (`gemini_client.py`, `hunter_client.py`) and routes all dossier/enrichment execution through `RunService` with validated provider outputs.
+
+Reason:
+Preserves architecture boundaries (routes thin, integrations isolated) while making third-party response handling explicit and testable.
+
+---
+
+## 2026-05-25
+Decision:
+When Hunter lookup fails, company rows remain `pending_review` and provider failure details are persisted in company metadata; run-level `error_message` stores non-fatal failure summaries.
+
+Reason:
+Keeps companies reviewable even when enrichment is incomplete, while surfacing recoverable provider issues to polling clients.
