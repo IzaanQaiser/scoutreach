@@ -1,5 +1,5 @@
 FIRST READ:
-/docs/MASTER_CONTEXT.md
+/docs/master_context.md
 
 Single-link implementation briefing:
 /docs/implementation_handbook.md
