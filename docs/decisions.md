@@ -42,3 +42,21 @@ Auth baseline supports strict bearer auth with a development-only fallback token
 
 Reason:
 Enables immediate integration testing without requiring live Supabase Auth traffic, while still preserving server-side auth dependency boundaries.
+
+---
+
+## 2026-05-25
+Decision:
+Phase 2 run pipeline uses a repository abstraction with a Supabase-backed implementation for non-test environments and an in-memory implementation for test runs.
+
+Reason:
+Allows deterministic integration testing without paid network dependencies while preserving production persistence behavior.
+
+---
+
+## 2026-05-25
+Decision:
+`POST /runs` triggers scraping work via FastAPI background tasks and marks run state through `running -> scraping -> completed|completed_with_errors` without adding external queue infrastructure yet.
+
+Reason:
+Implements required Phase 2 behavior with minimal architecture overhead, consistent with MVP-first and explicit-flow constraints.
