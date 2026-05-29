@@ -96,3 +96,12 @@ Company status updates are restricted to review states (`pending_review`, `accep
 
 Reason:
 Prevents ambiguous lifecycle mutations and preserves explicit failure semantics for `dossier_failed`/`scrape_failed` records.
+
+---
+
+## 2026-05-29
+Decision:
+Phase 4 frontend is scaffolded under `/frontend` as a minimal Next.js app with a dedicated review dashboard wired to `GET /runs/{run_id}/companies`, `PATCH /companies/{company_id}`, and `GET /runs/{run_id}/companies/pending-count`.
+
+Reason:
+Closes the remaining Phase 4 wiring gap with explicit client-side state flow and test coverage for swipe-triggered API calls.

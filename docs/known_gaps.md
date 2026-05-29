@@ -9,7 +9,6 @@
 
 ## Product Flow
 - Sending orchestration is not implemented yet (Phase 6+).
-- Frontend swipe UI wiring for the new Phase 4 review endpoints is still pending.
 
 ## Phase 2 Scraper
 - Current scraper integration is a deterministic stub in `backend/app/integrations/playwright_scraper.py`; real Playwright YC scraping is deferred.

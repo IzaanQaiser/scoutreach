@@ -22,4 +22,20 @@ pytest
 
 ## Frontend
 
-Frontend app is not scaffolded yet in Phase 1.
+### Install dependencies
+```bash
+cd frontend
+npm install
+```
+
+### Run app (dev)
+```bash
+cd frontend
+npm run dev
+```
+
+### Run tests
+```bash
+cd frontend
+npm test
+```
