@@ -1,0 +1,100 @@
+:root {
+  color-scheme: light;
+  --bg: #f4f0e8;
+  --panel: #ffffff;
+  --text: #1d1f1f;
+  --accent: #0f766e;
+  --danger: #b91c1c;
+  --line: #d8d2c5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top right, #ebe5da 0%, var(--bg) 45%, #efe8de 100%);
+  color: var(--text);
+}
+
+.page {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: 0 12px 24px rgba(20, 28, 33, 0.05);
+}
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+input {
+  flex: 1;
+  min-width: 260px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+}
+
+button {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.6rem 0.95rem;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.review article h2 {
+  margin-top: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.actions button:first-child {
+  background: #525252;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.meta {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .page {
+    margin: 1rem auto;
+  }
+
+  input {
+    min-width: 100%;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}
