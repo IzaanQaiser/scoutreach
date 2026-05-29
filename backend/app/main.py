@@ -7,6 +7,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 
+from app.api.routes.companies import router as companies_router
 from app.api.routes.health import router as health_router
 from app.api.routes.me import router as me_router
 from app.api.routes.runs import router as runs_router
@@ -16,6 +17,7 @@ from app.integrations.gemini_client import GeminiDossierClient
 from app.integrations.hunter_client import HunterEmailClient
 from app.integrations.playwright_scraper import PlaywrightYcScraper
 from app.middleware.errors import register_error_handlers
+from app.services.company_service import CompanyService
 from app.services.run_service import RunService
 from app.utils.settings import load_settings
 
@@ -39,6 +41,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         gemini_client=app.state.gemini_client,
         hunter_client=app.state.hunter_client,
     )
+    app.state.company_service = CompanyService(repository=run_repository)
     yield
 
 
@@ -54,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(me_router)
     app.include_router(runs_router)
+    app.include_router(companies_router)
 
     return app
 

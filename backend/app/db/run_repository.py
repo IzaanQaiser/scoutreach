@@ -1,4 +1,4 @@
-"""Persistence layer for run and company Phase 2 workflows."""
+"""Persistence layer for run and company Phase 2-4 workflows."""
 
 from __future__ import annotations
 
@@ -71,6 +71,25 @@ class RunRepository(ABC):
 
     @abstractmethod
     def get_companies_for_run(self, *, run_id: str) -> list[dict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_companies_for_run(
+        self,
+        *,
+        run_id: str,
+        status: str | None,
+        limit: int,
+        offset: int,
+    ) -> list[dict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_company(self, *, company_id: str) -> dict | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_company(self, *, company_id: str, fields: dict) -> None:
         raise NotImplementedError
 
 
@@ -184,6 +203,38 @@ class InMemoryRunRepository(RunRepository):
         with self._lock:
             return [dict(company) for company in self._companies if company["run_id"] == run_id]
 
+    def list_companies_for_run(
+        self,
+        *,
+        run_id: str,
+        status: str | None,
+        limit: int,
+        offset: int,
+    ) -> list[dict]:
+        with self._lock:
+            rows = [dict(company) for company in self._companies if company["run_id"] == run_id]
+
+        if status is not None:
+            rows = [row for row in rows if row.get("status") == status]
+
+        rows.sort(key=lambda row: str(row.get("created_at", "")))
+        return rows[offset : offset + limit]
+
+    def get_company(self, *, company_id: str) -> dict | None:
+        with self._lock:
+            for company in self._companies:
+                if company["id"] == company_id:
+                    return dict(company)
+        return None
+
+    def update_company(self, *, company_id: str, fields: dict) -> None:
+        with self._lock:
+            for company in self._companies:
+                if company["id"] == company_id:
+                    company.update(fields)
+                    company["updated_at"] = _utc_now_iso()
+                    return
+
 
 def _rows(response: object) -> list[dict]:
     if hasattr(response, "data"):
@@ -293,3 +344,26 @@ class SupabaseRunRepository(RunRepository):
     def get_companies_for_run(self, *, run_id: str) -> list[dict]:
         rows = _rows(self._client.table("companies").select("*").eq("run_id", run_id).execute())
         return [dict(row) for row in rows]
+
+    def list_companies_for_run(
+        self,
+        *,
+        run_id: str,
+        status: str | None,
+        limit: int,
+        offset: int,
+    ) -> list[dict]:
+        query = self._client.table("companies").select("*").eq("run_id", run_id).order("created_at")
+        if status is not None:
+            query = query.eq("status", status)
+        if limit > 0:
+            query = query.range(offset, offset + limit - 1)
+        rows = _rows(query.execute())
+        return [dict(row) for row in rows]
+
+    def get_company(self, *, company_id: str) -> dict | None:
+        rows = _rows(self._client.table("companies").select("*").eq("id", company_id).limit(1).execute())
+        return dict(rows[0]) if rows else None
+
+    def update_company(self, *, company_id: str, fields: dict) -> None:
+        self._client.table("companies").update(fields).eq("id", company_id).execute()
