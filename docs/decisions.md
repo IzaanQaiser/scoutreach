@@ -78,3 +78,21 @@ When Hunter lookup fails, company rows remain `pending_review` and provider fail
 
 Reason:
 Keeps companies reviewable even when enrichment is incomplete, while surfacing recoverable provider issues to polling clients.
+
+---
+
+## 2026-05-25
+Decision:
+Phase 4 introduces explicit company review endpoints (`GET /runs/{run_id}/companies`, `PATCH /companies/{company_id}`, `GET /runs/{run_id}/companies/pending-count`) through a dedicated `CompanyService` ownership and transition guard layer.
+
+Reason:
+Keeps review behavior aligned with API contracts while preserving route thinness and server-side ownership enforcement.
+
+---
+
+## 2026-05-25
+Decision:
+Company status updates are restricted to review states (`pending_review`, `accepted`, `rejected`) and reject transitions from failure states.
+
+Reason:
+Prevents ambiguous lifecycle mutations and preserves explicit failure semantics for `dossier_failed`/`scrape_failed` records.
