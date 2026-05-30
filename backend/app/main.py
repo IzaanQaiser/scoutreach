@@ -7,6 +7,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 
+from app.api.routes.account import router as account_router
 from app.api.routes.companies import router as companies_router
 from app.api.routes.health import router as health_router
 from app.api.routes.me import router as me_router
@@ -20,6 +21,7 @@ from app.integrations.hunter_client import HunterEmailClient
 from app.integrations.playwright_scraper import PlaywrightYcScraper
 from app.middleware.errors import register_error_handlers
 from app.services.company_service import CompanyService
+from app.services.account_service import AccountService
 from app.services.outreach_generation_service import OutreachGenerationService
 from app.services.outreach_service import OutreachService
 from app.services.run_service import RunService
@@ -47,6 +49,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         hunter_client=app.state.hunter_client,
     )
     app.state.company_service = CompanyService(repository=run_repository)
+    app.state.account_service = AccountService(
+        repository=run_repository,
+        gemini_client=app.state.gemini_client,
+    )
     app.state.outreach_generation_service = OutreachGenerationService(
         repository=run_repository,
         gemini_client=app.state.gemini_client,
@@ -70,6 +76,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(me_router)
+    app.include_router(account_router)
     app.include_router(runs_router)
     app.include_router(companies_router)
     app.include_router(outreach_router)

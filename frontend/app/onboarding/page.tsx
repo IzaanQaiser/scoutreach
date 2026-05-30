@@ -1,22 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { useAuth } from "../../components/auth-provider";
-import { ReviewDashboard } from "../../components/review-dashboard";
 import { getOnboardingState } from "../../lib/api";
 import { onboardingStepToRoute } from "../../lib/onboarding-routing";
 
-export default function DashboardPage() {
+export default function OnboardingIndexPage() {
   const router = useRouter();
-  const { token, isLoading, isAuthenticated, signOut } = useAuth();
-  const [isReady, setIsReady] = useState(false);
+  const { token, isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
 
-    async function validateAccess() {
+    async function redirectToCurrentStep() {
       if (isLoading) {
         return;
       }
@@ -31,13 +29,11 @@ export default function DashboardPage() {
         if (cancelled) {
           return;
         }
-
-        if (!state.onboarding_complete) {
-          router.replace(onboardingStepToRoute(state.step));
+        if (state.onboarding_complete) {
+          router.replace("/dashboard");
           return;
         }
-
-        setIsReady(true);
+        router.replace(onboardingStepToRoute(state.step));
       } catch {
         if (!cancelled) {
           router.replace("/auth");
@@ -45,22 +41,18 @@ export default function DashboardPage() {
       }
     }
 
-    void validateAccess();
+    void redirectToCurrentStep();
 
     return () => {
       cancelled = true;
     };
   }, [isAuthenticated, isLoading, router, token]);
 
-  if (!isReady) {
-    return (
-      <main className="page">
-        <section className="panel">
-          <h1>Loading dashboard...</h1>
-        </section>
-      </main>
-    );
-  }
-
-  return <ReviewDashboard token={token} onSignOut={signOut} />;
+  return (
+    <main className="page">
+      <section className="panel">
+        <h1>Loading onboarding...</h1>
+      </section>
+    </main>
+  );
 }

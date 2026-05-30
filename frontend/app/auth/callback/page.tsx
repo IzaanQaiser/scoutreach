@@ -1,22 +1,26 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-import { useAuth } from "../components/auth-provider";
-import { getOnboardingState } from "../lib/api";
-import { onboardingStepToRoute } from "../lib/onboarding-routing";
+import { useAuth } from "../../../components/auth-provider";
+import { getOnboardingState } from "../../../lib/api";
+import { onboardingStepToRoute } from "../../../lib/onboarding-routing";
 
-export default function HomePage() {
+export default function AuthCallbackPage() {
   const router = useRouter();
   const { token, isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
 
-    async function resolveRoute() {
-      if (!isAuthenticated || isLoading) {
+    async function completeAuthRedirect() {
+      if (isLoading) {
+        return;
+      }
+
+      if (!isAuthenticated) {
+        router.replace("/auth");
         return;
       }
 
@@ -34,12 +38,12 @@ export default function HomePage() {
         router.replace(onboardingStepToRoute(state.step));
       } catch {
         if (!cancelled) {
-          router.replace("/auth");
+          router.replace("/onboarding/name");
         }
       }
     }
 
-    void resolveRoute();
+    void completeAuthRedirect();
 
     return () => {
       cancelled = true;
@@ -49,13 +53,8 @@ export default function HomePage() {
   return (
     <main className="page">
       <section className="panel">
-        <h1>ScoutReach</h1>
-        <p>Discover startup opportunities and ship tailored outreach faster.</p>
-        <div className="actions">
-          <Link href="/auth" className="button-link">
-            Get Started
-          </Link>
-        </div>
+        <h1>Finishing sign in...</h1>
+        <p>Redirecting you to ScoutReach.</p>
       </section>
     </main>
   );

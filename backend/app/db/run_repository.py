@@ -22,6 +22,34 @@ class RunRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_user(self, *, user_id: str) -> dict | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_user(self, *, user_id: str, fields: dict) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def has_candidate_profile(self, *, user_id: str) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_candidate_profile(self, *, user_id: str) -> dict | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def upsert_candidate_profile(self, *, user_id: str, fields: dict) -> dict:
+        raise NotImplementedError
+
+    @abstractmethod
+    def count_onboarding_calibration_events_today(self, *, user_id: str) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def insert_onboarding_calibration_event(self, *, payload: dict) -> dict:
+        raise NotImplementedError
+
+    @abstractmethod
     def get_profile_snapshot(self, *, user_id: str) -> dict:
         raise NotImplementedError
 
@@ -153,14 +181,95 @@ class InMemoryRunRepository(RunRepository):
         self._companies: list[dict] = []
         self._outreach: list[dict] = []
         self._outreach_regeneration_events: list[dict] = []
+        self._onboarding_calibration_events: list[dict] = []
 
     def ensure_user_exists(self, *, user_id: str, email: str) -> None:
         with self._lock:
+            existing = self._users.get(user_id, {})
+            now_iso = _utc_now_iso()
             self._users[user_id] = {
                 "id": user_id,
                 "email": email,
-                "message_preferences": self._users.get(user_id, {}).get("message_preferences", {}),
+                "premium_status": bool(existing.get("premium_status", False)),
+                "tokens_used": int(existing.get("tokens_used", 0)),
+                "auto_send_enabled": bool(existing.get("auto_send_enabled", False)),
+                "message_preferences": dict(existing.get("message_preferences", {})),
+                "first_name": existing.get("first_name"),
+                "last_name": existing.get("last_name"),
+                "onboarding_status": str(existing.get("onboarding_status", "not_started")),
+                "onboarding_step": str(existing.get("onboarding_step", "auth")),
+                "onboarding_completed_at": existing.get("onboarding_completed_at"),
+                "created_at": existing.get("created_at", now_iso),
+                "updated_at": now_iso,
             }
+
+    def get_user(self, *, user_id: str) -> dict | None:
+        with self._lock:
+            row = self._users.get(user_id)
+            return dict(row) if row is not None else None
+
+    def update_user(self, *, user_id: str, fields: dict) -> None:
+        with self._lock:
+            row = self._users.get(user_id)
+            if row is None:
+                return
+            row.update(fields)
+            row["updated_at"] = _utc_now_iso()
+
+    def has_candidate_profile(self, *, user_id: str) -> bool:
+        with self._lock:
+            profile = self._candidate_profiles.get(user_id)
+            return profile is not None and bool(profile)
+
+    def get_candidate_profile(self, *, user_id: str) -> dict | None:
+        with self._lock:
+            profile = self._candidate_profiles.get(user_id)
+            return dict(profile) if profile is not None else None
+
+    def upsert_candidate_profile(self, *, user_id: str, fields: dict) -> dict:
+        with self._lock:
+            now_iso = _utc_now_iso()
+            existing = self._candidate_profiles.get(user_id, {})
+            row = {
+                "user_id": user_id,
+                "resume": existing.get("resume"),
+                "skills": existing.get("skills", {}),
+                "github_url": existing.get("github_url"),
+                "github_content": existing.get("github_content", {}),
+                "linkedin_url": existing.get("linkedin_url"),
+                "linkedin_content": existing.get("linkedin_content", {}),
+                "portfolio_url": existing.get("portfolio_url"),
+                "portfolio_content": existing.get("portfolio_content", {}),
+                "bio": existing.get("bio"),
+                "extra_context": existing.get("extra_context"),
+                "target_roles": existing.get("target_roles", []),
+                "job_preferences": existing.get("job_preferences", {}),
+                "created_at": existing.get("created_at", now_iso),
+                "updated_at": now_iso,
+            }
+            row.update(fields)
+            row["updated_at"] = now_iso
+            self._candidate_profiles[user_id] = row
+            return dict(row)
+
+    def count_onboarding_calibration_events_today(self, *, user_id: str) -> int:
+        today = datetime.now(UTC).date()
+        with self._lock:
+            rows = [row for row in self._onboarding_calibration_events if row["user_id"] == user_id]
+        return sum(datetime.fromisoformat(str(row["created_at"])).date() == today for row in rows)
+
+    def insert_onboarding_calibration_event(self, *, payload: dict) -> dict:
+        with self._lock:
+            row = {
+                "id": str(uuid4()),
+                "user_id": payload["user_id"],
+                "event_type": payload["event_type"],
+                "loop_index": int(payload.get("loop_index", 0)),
+                "feedback": payload.get("feedback", {}),
+                "created_at": _utc_now_iso(),
+            }
+            self._onboarding_calibration_events.append(row)
+            return dict(row)
 
     def get_profile_snapshot(self, *, user_id: str) -> dict:
         with self._lock:
@@ -404,6 +513,48 @@ class SupabaseRunRepository(RunRepository):
     def ensure_user_exists(self, *, user_id: str, email: str) -> None:
         payload = {"id": user_id, "email": email}
         self._client.table("users").upsert(payload, on_conflict="id").execute()
+
+    def get_user(self, *, user_id: str) -> dict | None:
+        rows = _rows(self._client.table("users").select("*").eq("id", user_id).limit(1).execute())
+        return dict(rows[0]) if rows else None
+
+    def update_user(self, *, user_id: str, fields: dict) -> None:
+        self._client.table("users").update(fields).eq("id", user_id).execute()
+
+    def has_candidate_profile(self, *, user_id: str) -> bool:
+        rows = _rows(
+            self._client.table("candidate_profile").select("user_id").eq("user_id", user_id).limit(1).execute()
+        )
+        return bool(rows)
+
+    def get_candidate_profile(self, *, user_id: str) -> dict | None:
+        rows = _rows(self._client.table("candidate_profile").select("*").eq("user_id", user_id).limit(1).execute())
+        return dict(rows[0]) if rows else None
+
+    def upsert_candidate_profile(self, *, user_id: str, fields: dict) -> dict:
+        payload = {"user_id": user_id, **fields}
+        rows = _rows(self._client.table("candidate_profile").upsert(payload, on_conflict="user_id").execute())
+        if rows:
+            return dict(rows[0])
+        latest = self.get_candidate_profile(user_id=user_id)
+        return latest if latest is not None else payload
+
+    def count_onboarding_calibration_events_today(self, *, user_id: str) -> int:
+        day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        rows = _rows(
+            self._client.table("onboarding_calibration_events")
+            .select("id")
+            .eq("user_id", user_id)
+            .gte("created_at", day_start)
+            .execute()
+        )
+        return len(rows)
+
+    def insert_onboarding_calibration_event(self, *, payload: dict) -> dict:
+        rows = _rows(self._client.table("onboarding_calibration_events").insert(payload).execute())
+        if rows:
+            return dict(rows[0])
+        return {**payload, "id": str(uuid4()), "created_at": _utc_now_iso()}
 
     def get_profile_snapshot(self, *, user_id: str) -> dict:
         profile_rows = _rows(

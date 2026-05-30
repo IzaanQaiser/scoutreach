@@ -11,7 +11,7 @@ function companySubtitle(company: Company): string {
   return parts.join(" | ");
 }
 
-export function ReviewDashboard() {
+export function ReviewDashboard({ token, onSignOut }: { token: string | null; onSignOut: () => void }) {
   const [runIdInput, setRunIdInput] = useState("");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState<number>(0);
@@ -37,8 +37,8 @@ export function ReviewDashboard() {
 
     try {
       const [companies, count] = await Promise.all([
-        getRunCompanies({ runId, status: "pending_review", limit: 100, offset: 0 }),
-        getPendingCount({ runId }),
+        getRunCompanies(token, { runId, status: "pending_review", limit: 100, offset: 0 }),
+        getPendingCount(token, { runId }),
       ]);
 
       setActiveRunId(runId);
@@ -60,7 +60,7 @@ export function ReviewDashboard() {
     setErrorMessage(null);
 
     try {
-      await updateCompanyStatus({ companyId: current.id, status });
+      await updateCompanyStatus(token, { companyId: current.id, status });
       setQueue((previous) => previous.slice(1));
       setPendingCount((previous) => Math.max(0, previous - 1));
     } catch (error) {
@@ -75,6 +75,11 @@ export function ReviewDashboard() {
       <section className="panel">
         <h1>Evaluate Matches</h1>
         <p>Load pending companies for a run, then swipe right (accept) or left (reject).</p>
+        <div className="actions">
+          <button type="button" className="secondary" onClick={onSignOut}>
+            Sign out
+          </button>
+        </div>
 
         <div className="controls">
           <input
