@@ -3,6 +3,7 @@
 ## Auth
 - Phase 1 `/me` currently reflects authenticated token identity but does not yet hydrate full user profile fields from `users` table.
 - Supabase token verification is implemented, but development/test fallback token path still exists by design (`ALLOW_DEV_AUTH=true` in non-production environments only).
+- Frontend login/signup UI, onboarding routes, and dashboard route guards are not implemented yet; see `/docs/auth_onboarding_build_blueprint.md` for the formal build plan.
 
 ## Database
 - Migration files exist, but no migration runner CLI is wired yet; execution is manual via SQL tooling.

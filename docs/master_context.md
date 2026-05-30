@@ -247,6 +247,7 @@ This section MUST include every tracked markdown file in the repo.
 - `/docs/development_standards.md`
 - `/docs/codex_rules.md`
 - `/docs/implementation_handbook.md`
+- `/docs/auth_onboarding_build_blueprint.md`
 - `/docs/commands.md`
 - `/docs/testing.md`
 - `/docs/git_workflow.md`
