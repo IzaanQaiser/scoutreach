@@ -135,6 +135,20 @@ class GeminiDossierClient:
                 message="Gemini outreach generation failed (simulated).",
             )
 
+        if "message-429" in company_name.lower() or "message-429" in domain:
+            raise ProviderError(
+                code="GEMINI_RATE_LIMITED",
+                provider="gemini",
+                message="Gemini outreach generation rate limited (simulated).",
+            )
+
+        if "message-5xx" in company_name.lower() or "message-5xx" in domain:
+            raise ProviderError(
+                code="GEMINI_TRANSIENT",
+                provider="gemini",
+                message="Gemini transient generation error (simulated).",
+            )
+
         target_roles = profile_snapshot.get("target_roles")
         preferred_role = None
         if isinstance(target_roles, list) and target_roles:
@@ -162,6 +176,18 @@ class GeminiDossierClient:
         message_preferences_override: dict | None,
     ) -> dict:
         critique_text = critique.strip()
+        if "fail-regen-429" in critique_text.lower():
+            raise ProviderError(
+                code="GEMINI_RATE_LIMITED",
+                provider="gemini",
+                message="Gemini regeneration rate limited (simulated).",
+            )
+        if "fail-regen-5xx" in critique_text.lower():
+            raise ProviderError(
+                code="GEMINI_TRANSIENT",
+                provider="gemini",
+                message="Gemini regeneration transient failure (simulated).",
+            )
         if "fail-regen" in critique_text.lower():
             raise ProviderError(
                 code="GEMINI_FAILED",

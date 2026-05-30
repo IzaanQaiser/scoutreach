@@ -20,6 +20,20 @@ class HunterEmailClient:
                 message="Hunter lookup failed (simulated).",
             )
 
+        if "hunter-429" in normalized_domain:
+            raise ProviderError(
+                code="HUNTER_RATE_LIMITED",
+                provider="hunter",
+                message="Hunter lookup rate limited (simulated).",
+            )
+
+        if "hunter-5xx" in normalized_domain:
+            raise ProviderError(
+                code="HUNTER_TRANSIENT",
+                provider="hunter",
+                message="Hunter transient provider failure (simulated).",
+            )
+
         enriched: list[dict] = []
         for founder in founders:
             normalized = dict(founder)

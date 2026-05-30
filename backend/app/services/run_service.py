@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 import logging
+import time
 
 from app.db.run_repository import RunRepository
 from app.integrations.gemini_client import GeminiDossierClient
@@ -26,11 +27,26 @@ from app.models.statuses import (
     RUN_STATUS_RUNNING,
     RUN_STATUS_SCRAPING,
 )
+from app.utils.provider_resilience import call_with_backoff
 
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_RUNS_PER_DAY_LIMIT = 3
+DEFAULT_PROVIDER_MAX_ATTEMPTS = 3
+DEFAULT_PROVIDER_BASE_DELAY_SECONDS = 0.2
+DEFAULT_PROVIDER_MAX_JITTER_SECONDS = 0.2
+DEFAULT_PROVIDER_THROTTLE_SECONDS = 0.05
+
+GEMINI_RETRYABLE_CODES = {
+    "GEMINI_RATE_LIMITED",
+    "GEMINI_TRANSIENT",
+}
+
+HUNTER_RETRYABLE_CODES = {
+    "HUNTER_RATE_LIMITED",
+    "HUNTER_TRANSIENT",
+}
 
 
 class RunService:
@@ -42,12 +58,20 @@ class RunService:
         gemini_client: GeminiDossierClient,
         hunter_client: HunterEmailClient,
         runs_per_day_limit: int = DEFAULT_RUNS_PER_DAY_LIMIT,
+        provider_max_attempts: int = DEFAULT_PROVIDER_MAX_ATTEMPTS,
+        provider_base_delay_seconds: float = DEFAULT_PROVIDER_BASE_DELAY_SECONDS,
+        provider_max_jitter_seconds: float = DEFAULT_PROVIDER_MAX_JITTER_SECONDS,
+        provider_throttle_seconds: float = DEFAULT_PROVIDER_THROTTLE_SECONDS,
     ) -> None:
         self._repository = repository
         self._scraper = scraper
         self._gemini_client = gemini_client
         self._hunter_client = hunter_client
         self._runs_per_day_limit = runs_per_day_limit
+        self._provider_max_attempts = max(provider_max_attempts, 1)
+        self._provider_base_delay_seconds = max(provider_base_delay_seconds, 0)
+        self._provider_max_jitter_seconds = max(provider_max_jitter_seconds, 0)
+        self._provider_throttle_seconds = max(provider_throttle_seconds, 0)
 
     def create_run(self, *, user: AuthenticatedUser, selected_batches: list[str]) -> dict:
         self._repository.ensure_user_exists(user_id=user.user_id, email=user.email)
@@ -232,14 +256,22 @@ class RunService:
         )
 
         try:
-            payload["dossier"] = self._gemini_client.generate_company_dossier(
-                company_name=company.name,
-                batch=company.batch,
-                tags=[],
-                founders=founders_payload,
-                website_content={},
-                raw_scraped_data=raw_scraped_data,
+            payload["dossier"] = call_with_backoff(
+                operation=lambda: self._gemini_client.generate_company_dossier(
+                    company_name=company.name,
+                    batch=company.batch,
+                    tags=[],
+                    founders=founders_payload,
+                    website_content={},
+                    raw_scraped_data=raw_scraped_data,
+                ),
+                retryable_codes=GEMINI_RETRYABLE_CODES,
+                max_attempts=self._provider_max_attempts,
+                base_delay_seconds=self._provider_base_delay_seconds,
+                max_jitter_seconds=self._provider_max_jitter_seconds,
             )
+            if self._provider_throttle_seconds > 0:
+                time.sleep(self._provider_throttle_seconds)
         except ProviderError as exc:
             failure_counts["dossier_failed"] += 1
             logger.warning("dossier_generation_failed", extra={"run_id": run_id, "company": company.name})
@@ -258,10 +290,18 @@ class RunService:
             )
 
             try:
-                payload["founders"] = self._hunter_client.enrich_founders(
-                    founders=founders_payload,
-                    domain=company.domain,
+                payload["founders"] = call_with_backoff(
+                    operation=lambda: self._hunter_client.enrich_founders(
+                        founders=founders_payload,
+                        domain=company.domain,
+                    ),
+                    retryable_codes=HUNTER_RETRYABLE_CODES,
+                    max_attempts=self._provider_max_attempts,
+                    base_delay_seconds=self._provider_base_delay_seconds,
+                    max_jitter_seconds=self._provider_max_jitter_seconds,
                 )
+                if self._provider_throttle_seconds > 0:
+                    time.sleep(self._provider_throttle_seconds)
             except ProviderError as exc:
                 failure_counts["hunter_failed"] += 1
                 logger.warning("hunter_lookup_failed", extra={"run_id": run_id, "company": company.name})

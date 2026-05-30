@@ -109,6 +109,14 @@ class RunRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def insert_outreach_regeneration_event(self, *, payload: dict) -> dict:
+        raise NotImplementedError
+
+    @abstractmethod
+    def count_outreach_regenerations_today(self, *, user_id: str) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
     def get_outreach_for_run(self, *, run_id: str) -> list[dict]:
         raise NotImplementedError
 
@@ -144,6 +152,7 @@ class InMemoryRunRepository(RunRepository):
         self._runs: dict[str, dict] = {}
         self._companies: list[dict] = []
         self._outreach: list[dict] = []
+        self._outreach_regeneration_events: list[dict] = []
 
     def ensure_user_exists(self, *, user_id: str, email: str) -> None:
         with self._lock:
@@ -309,6 +318,20 @@ class InMemoryRunRepository(RunRepository):
             row.get("sent_at") is not None and datetime.fromisoformat(str(row["sent_at"])).date() == today
             for row in rows
         )
+
+    def insert_outreach_regeneration_event(self, *, payload: dict) -> dict:
+        with self._lock:
+            row = dict(payload)
+            row["id"] = str(uuid4())
+            row["created_at"] = _utc_now_iso()
+            self._outreach_regeneration_events.append(row)
+            return dict(row)
+
+    def count_outreach_regenerations_today(self, *, user_id: str) -> int:
+        today = datetime.now(UTC).date()
+        with self._lock:
+            rows = [row for row in self._outreach_regeneration_events if row["user_id"] == user_id]
+        return sum(datetime.fromisoformat(row["created_at"]).date() == today for row in rows)
 
     def get_outreach_for_run(self, *, run_id: str) -> list[dict]:
         with self._lock:
@@ -520,6 +543,28 @@ class SupabaseRunRepository(RunRepository):
             .eq("user_id", user_id)
             .eq("status", "sent")
             .gte("sent_at", day_start)
+            .execute()
+        )
+        return len(rows)
+
+    def insert_outreach_regeneration_event(self, *, payload: dict) -> dict:
+        rows = _rows(self._client.table("outreach_regeneration_events").insert(payload).execute())
+        if rows:
+            return dict(rows[0])
+
+        return {
+            **payload,
+            "id": str(uuid4()),
+            "created_at": _utc_now_iso(),
+        }
+
+    def count_outreach_regenerations_today(self, *, user_id: str) -> int:
+        day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        rows = _rows(
+            self._client.table("outreach_regeneration_events")
+            .select("id")
+            .eq("user_id", user_id)
+            .gte("created_at", day_start)
             .execute()
         )
         return len(rows)

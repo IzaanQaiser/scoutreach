@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 import logging
-import random
 import time
 
 from app.db.run_repository import RunRepository
@@ -28,15 +27,22 @@ from app.models.statuses import (
     RUN_STATUS_MESSAGES_GENERATED,
     RUN_STATUS_SENDING,
 )
+from app.utils.provider_resilience import call_with_backoff
 
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_SENDS_PER_DAY_LIMIT = 350
+DEFAULT_REGENERATIONS_PER_DAY_LIMIT = 150
 DEFAULT_SEND_RETRY_ATTEMPTS = 3
 DEFAULT_SEND_RETRY_BASE_DELAY_SECONDS = 0.2
 DEFAULT_SEND_RETRY_MAX_JITTER_SECONDS = 0.2
 DEFAULT_PROVIDER_THROTTLE_SECONDS = 0.05
+
+RETRYABLE_GEMINI_CODES = {
+    "GEMINI_RATE_LIMITED",
+    "GEMINI_TRANSIENT",
+}
 
 RETRYABLE_GMAIL_CODES = {
     "GMAIL_RATE_LIMITED",
@@ -62,6 +68,7 @@ class OutreachService:
         gemini_client: GeminiDossierClient,
         gmail_client: GmailClient,
         sends_per_day_limit: int = DEFAULT_SENDS_PER_DAY_LIMIT,
+        regenerations_per_day_limit: int = DEFAULT_REGENERATIONS_PER_DAY_LIMIT,
         send_retry_attempts: int = DEFAULT_SEND_RETRY_ATTEMPTS,
         send_retry_base_delay_seconds: float = DEFAULT_SEND_RETRY_BASE_DELAY_SECONDS,
         send_retry_max_jitter_seconds: float = DEFAULT_SEND_RETRY_MAX_JITTER_SECONDS,
@@ -71,6 +78,7 @@ class OutreachService:
         self._gemini_client = gemini_client
         self._gmail_client = gmail_client
         self._sends_per_day_limit = sends_per_day_limit
+        self._regenerations_per_day_limit = regenerations_per_day_limit
         self._send_retry_attempts = max(send_retry_attempts, 1)
         self._send_retry_base_delay_seconds = max(send_retry_base_delay_seconds, 0)
         self._send_retry_max_jitter_seconds = max(send_retry_max_jitter_seconds, 0)
@@ -220,18 +228,48 @@ class OutreachService:
                 message="Company not found.",
             )
 
+        used_today = self._repository.count_outreach_regenerations_today(user_id=user.user_id)
+        if used_today >= self._regenerations_per_day_limit:
+            logger.warning(
+                "regeneration_quota_rejected",
+                extra={"outreach_id": outreach_id, "user_id": user.user_id},
+            )
+            raise ApiError(
+                status_code=429,
+                code="QUOTA_EXCEEDED",
+                message="Daily regeneration quota exceeded.",
+                details={
+                    "daily_limit": self._regenerations_per_day_limit,
+                    "used_today": used_today,
+                },
+            )
+
+        self._repository.insert_outreach_regeneration_event(
+            payload={
+                "user_id": user.user_id,
+                "run_id": str(run["id"]),
+                "outreach_id": outreach_id,
+            }
+        )
+
         founder = {
             "name": outreach.get("founder_name"),
             "email": outreach.get("founder_email"),
         }
 
         try:
-            regenerated = self._gemini_client.regenerate_outreach_draft(
-                company=company,
-                founder=founder,
-                profile_snapshot=run.get("profile_snapshot") or {},
-                critique=critique,
-                message_preferences_override=message_preferences_override,
+            regenerated = call_with_backoff(
+                operation=lambda: self._gemini_client.regenerate_outreach_draft(
+                    company=company,
+                    founder=founder,
+                    profile_snapshot=run.get("profile_snapshot") or {},
+                    critique=critique,
+                    message_preferences_override=message_preferences_override,
+                ),
+                retryable_codes=RETRYABLE_GEMINI_CODES,
+                max_attempts=self._send_retry_attempts,
+                base_delay_seconds=self._send_retry_base_delay_seconds,
+                max_jitter_seconds=self._send_retry_max_jitter_seconds,
             )
         except ProviderError as exc:
             logger.warning(
@@ -250,6 +288,9 @@ class OutreachService:
                 code=exc.code,
                 message=exc.message,
             ) from exc
+
+        if self._provider_throttle_seconds > 0:
+            time.sleep(self._provider_throttle_seconds)
 
         self._repository.update_outreach(
             outreach_id=outreach_id,
@@ -498,25 +539,18 @@ class OutreachService:
 
     def _send_with_retry(self, *, outreach: dict) -> None:
         outreach_id = str(outreach.get("id"))
-
-        attempt = 1
-        while True:
-            try:
-                self._gmail_client.send_message(
-                    outreach_id=outreach_id,
-                    to_email=outreach.get("founder_email"),
-                    subject=outreach.get("subject"),
-                    message_content=outreach.get("message_content"),
-                )
-                return
-            except ProviderError as exc:
-                if attempt >= self._send_retry_attempts or exc.code not in RETRYABLE_GMAIL_CODES:
-                    raise
-
-                backoff_delay = self._send_retry_base_delay_seconds * (2 ** (attempt - 1))
-                jitter = random.uniform(0, self._send_retry_max_jitter_seconds)
-                time.sleep(backoff_delay + jitter)
-                attempt += 1
+        call_with_backoff(
+            operation=lambda: self._gmail_client.send_message(
+                outreach_id=outreach_id,
+                to_email=outreach.get("founder_email"),
+                subject=outreach.get("subject"),
+                message_content=outreach.get("message_content"),
+            ),
+            retryable_codes=RETRYABLE_GMAIL_CODES,
+            max_attempts=self._send_retry_attempts,
+            base_delay_seconds=self._send_retry_base_delay_seconds,
+            max_jitter_seconds=self._send_retry_max_jitter_seconds,
+        )
 
     def _company_name_by_id(self, *, run_id: str) -> dict[str, str]:
         companies = self._repository.get_companies_for_run(run_id=run_id)

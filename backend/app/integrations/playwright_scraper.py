@@ -81,6 +81,54 @@ class PlaywrightYcScraper:
                 )
                 continue
 
+            if normalized_batch == "HUNTER_429":
+                yield ScrapedCompany(
+                    batch=normalized_batch,
+                    name=f"Hunter Rate Limit {normalized_batch} Labs",
+                    yc_url=f"https://www.ycombinator.com/companies/hunter-rate-limit-{slug}",
+                    website_url=f"https://hunter-429-{slug}.com",
+                    domain=f"hunter-429-{slug}.com",
+                    founders=[{"name": f"Founder {normalized_batch}"}],
+                    raw_scraped_data={"source": "phase_stub", "batch": normalized_batch},
+                )
+                continue
+
+            if normalized_batch == "HUNTER_5XX":
+                yield ScrapedCompany(
+                    batch=normalized_batch,
+                    name=f"Hunter Transient {normalized_batch} Labs",
+                    yc_url=f"https://www.ycombinator.com/companies/hunter-transient-{slug}",
+                    website_url=f"https://hunter-5xx-{slug}.com",
+                    domain=f"hunter-5xx-{slug}.com",
+                    founders=[{"name": f"Founder {normalized_batch}"}],
+                    raw_scraped_data={"source": "phase_stub", "batch": normalized_batch},
+                )
+                continue
+
+            if normalized_batch == "MESSAGE_429":
+                yield ScrapedCompany(
+                    batch=normalized_batch,
+                    name=f"Message 429 {normalized_batch} Labs",
+                    yc_url=f"https://www.ycombinator.com/companies/message-429-{slug}",
+                    website_url=f"https://message-429-{slug}.com",
+                    domain=f"message-429-{slug}.com",
+                    founders=[{"name": f"Founder {normalized_batch}"}],
+                    raw_scraped_data={"source": "phase_stub", "batch": normalized_batch},
+                )
+                continue
+
+            if normalized_batch == "MESSAGE_5XX":
+                yield ScrapedCompany(
+                    batch=normalized_batch,
+                    name=f"Message 5xx {normalized_batch} Labs",
+                    yc_url=f"https://www.ycombinator.com/companies/message-5xx-{slug}",
+                    website_url=f"https://message-5xx-{slug}.com",
+                    domain=f"message-5xx-{slug}.com",
+                    founders=[{"name": f"Founder {normalized_batch}"}],
+                    raw_scraped_data={"source": "phase_stub", "batch": normalized_batch},
+                )
+                continue
+
             yield ScrapedCompany(
                 batch=normalized_batch,
                 name=f"Example {normalized_batch} Labs",
