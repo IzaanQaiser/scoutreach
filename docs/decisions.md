@@ -123,3 +123,21 @@ Generation failures now persist explicit `outreach` rows with `status=\"generati
 
 Reason:
 Preserves debuggability and lifecycle clarity without dropping failed attempts.
+
+---
+
+## 2026-05-30
+Decision:
+Phase 6 introduces a dedicated `OutreachService` and routes for outreach list/detail, draft edits, regenerate, review summary, and send operations (`send-approved` plus single-send).
+
+Reason:
+Keeps route handlers thin while centralizing ownership checks, status-transition guards, and outreach lifecycle behavior in one explicit service layer.
+
+---
+
+## 2026-05-30
+Decision:
+Send flows enforce approved-only status, per-user daily send quota checks, and provider-aware retry/backoff for simulated Gmail transient failures; each send attempt persists per-row `sent`/`failed` outcomes and timestamps.
+
+Reason:
+Maintains manual-review-first safety and preserves debuggable send state without introducing queue infrastructure mid-MVP.
