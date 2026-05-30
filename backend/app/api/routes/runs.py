@@ -6,7 +6,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
 from app.middleware.auth import AuthenticatedUser, require_current_user
 from app.schemas.responses import success_response
-from app.schemas.runs import RunCreateRequest
+from app.schemas.runs import GenerateMessagesRequest, RunCreateRequest
+from app.services.outreach_generation_service import OutreachGenerationService
 from app.services.run_service import RunService
 
 
@@ -15,6 +16,10 @@ router = APIRouter(prefix="/runs", tags=["runs"])
 
 def _get_run_service(request: Request) -> RunService:
     return request.app.state.run_service
+
+
+def _get_outreach_generation_service(request: Request) -> OutreachGenerationService:
+    return request.app.state.outreach_generation_service
 
 
 @router.post("")
@@ -41,3 +46,19 @@ def get_run_status(
 ) -> dict:
     return success_response(run_service.get_run_status(run_id=run_id, user=user))
 
+
+@router.post("/{run_id}/generate-messages")
+def generate_messages(
+    run_id: str,
+    payload: GenerateMessagesRequest,
+    user: AuthenticatedUser = Depends(require_current_user),
+    outreach_generation_service: OutreachGenerationService = Depends(_get_outreach_generation_service),
+) -> dict:
+    return success_response(
+        outreach_generation_service.generate_messages(
+            user=user,
+            run_id=run_id,
+            founder_selection_strategy=payload.founder_selection_strategy,
+            max_messages=payload.max_messages,
+        )
+    )

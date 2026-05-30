@@ -92,6 +92,22 @@ class RunRepository(ABC):
     def update_company(self, *, company_id: str, fields: dict) -> None:
         raise NotImplementedError
 
+    @abstractmethod
+    def insert_outreach(self, *, payload: dict) -> dict:
+        raise NotImplementedError
+
+    @abstractmethod
+    def count_outreach_created_today(self, *, user_id: str) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def count_outreach_for_run_by_status(self, *, run_id: str, status: str) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_outreach_for_run(self, *, run_id: str) -> list[dict]:
+        raise NotImplementedError
+
 
 class InMemoryRunRepository(RunRepository):
     def __init__(self) -> None:
@@ -100,6 +116,7 @@ class InMemoryRunRepository(RunRepository):
         self._candidate_profiles: dict[str, dict] = {}
         self._runs: dict[str, dict] = {}
         self._companies: list[dict] = []
+        self._outreach: list[dict] = []
 
     def ensure_user_exists(self, *, user_id: str, email: str) -> None:
         with self._lock:
@@ -235,6 +252,32 @@ class InMemoryRunRepository(RunRepository):
                     company["updated_at"] = _utc_now_iso()
                     return
 
+    def insert_outreach(self, *, payload: dict) -> dict:
+        with self._lock:
+            row = dict(payload)
+            row["id"] = str(uuid4())
+            row["created_at"] = _utc_now_iso()
+            row["updated_at"] = row["created_at"]
+            self._outreach.append(row)
+            return dict(row)
+
+    def count_outreach_created_today(self, *, user_id: str) -> int:
+        today = datetime.now(UTC).date()
+        with self._lock:
+            rows = [row for row in self._outreach if row["user_id"] == user_id]
+        return sum(datetime.fromisoformat(row["created_at"]).date() == today for row in rows)
+
+    def count_outreach_for_run_by_status(self, *, run_id: str, status: str) -> int:
+        with self._lock:
+            return sum(
+                row["run_id"] == run_id and row.get("status") == status
+                for row in self._outreach
+            )
+
+    def get_outreach_for_run(self, *, run_id: str) -> list[dict]:
+        with self._lock:
+            return [dict(row) for row in self._outreach if row["run_id"] == run_id]
+
 
 def _rows(response: object) -> list[dict]:
     if hasattr(response, "data"):
@@ -367,3 +410,33 @@ class SupabaseRunRepository(RunRepository):
 
     def update_company(self, *, company_id: str, fields: dict) -> None:
         self._client.table("companies").update(fields).eq("id", company_id).execute()
+
+    def insert_outreach(self, *, payload: dict) -> dict:
+        rows = _rows(self._client.table("outreach").insert(payload).execute())
+        if rows:
+            return dict(rows[0])
+
+        now_iso = _utc_now_iso()
+        return {
+            **payload,
+            "id": str(uuid4()),
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        }
+
+    def count_outreach_created_today(self, *, user_id: str) -> int:
+        day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        rows = _rows(
+            self._client.table("outreach").select("id").eq("user_id", user_id).gte("created_at", day_start).execute()
+        )
+        return len(rows)
+
+    def count_outreach_for_run_by_status(self, *, run_id: str, status: str) -> int:
+        rows = _rows(
+            self._client.table("outreach").select("id").eq("run_id", run_id).eq("status", status).execute()
+        )
+        return len(rows)
+
+    def get_outreach_for_run(self, *, run_id: str) -> list[dict]:
+        rows = _rows(self._client.table("outreach").select("*").eq("run_id", run_id).execute())
+        return [dict(row) for row in rows]

@@ -111,3 +111,43 @@ class GeminiDossierClient:
                 "raw_source": raw_scraped_data.get("source"),
             },
         }
+
+    def generate_outreach_draft(
+        self,
+        *,
+        company: dict,
+        founder: dict,
+        profile_snapshot: dict,
+    ) -> dict:
+        company_name = str(company.get("name") or "Company").strip() or "Company"
+        domain = str(company.get("domain") or "").strip().lower()
+        founder_name = str(founder.get("name") or "Founder").strip() or "Founder"
+
+        if (
+            "message-fail" in company_name.lower()
+            or "message_fail" in company_name.lower()
+            or "message-fail" in domain
+            or "message_fail" in domain
+        ):
+            raise ProviderError(
+                code="GEMINI_FAILED",
+                provider="gemini",
+                message="Gemini outreach generation failed (simulated).",
+            )
+
+        target_roles = profile_snapshot.get("target_roles")
+        preferred_role = None
+        if isinstance(target_roles, list) and target_roles:
+            preferred_role = str(target_roles[0]).strip() or None
+
+        role_line = preferred_role or "technical roles"
+
+        return {
+            "subject": f"Quick intro for {company_name}",
+            "message_content": (
+                f"Hi {founder_name},\\n\\n"
+                f"I've been following {company_name} and wanted to reach out about potential fit for {role_line}. "
+                "Happy to share relevant experience and examples if helpful.\\n\\n"
+                "Best,\\nScoutReach User"
+            ),
+        }

@@ -18,6 +18,7 @@ from app.integrations.hunter_client import HunterEmailClient
 from app.integrations.playwright_scraper import PlaywrightYcScraper
 from app.middleware.errors import register_error_handlers
 from app.services.company_service import CompanyService
+from app.services.outreach_generation_service import OutreachGenerationService
 from app.services.run_service import RunService
 from app.utils.settings import load_settings
 
@@ -42,6 +43,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         hunter_client=app.state.hunter_client,
     )
     app.state.company_service = CompanyService(repository=run_repository)
+    app.state.outreach_generation_service = OutreachGenerationService(
+        repository=run_repository,
+        gemini_client=app.state.gemini_client,
+    )
     yield
 
 

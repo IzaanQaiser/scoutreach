@@ -16,6 +16,8 @@ from app.models.statuses import (
     COMPANY_STATUS_DOSSIER_FAILED,
     COMPANY_STATUS_PENDING_REVIEW,
     COMPANY_STATUS_SCRAPE_FAILED,
+    OUTREACH_STATUS_DRAFT,
+    OUTREACH_STATUS_SENT,
     RUN_STATUS_COMPLETED,
     RUN_STATUS_COMPLETED_WITH_ERRORS,
     RUN_STATUS_DOSSIER_GENERATING,
@@ -159,6 +161,14 @@ class RunService:
         companies_scraped = self._repository.count_companies_for_run(run_id=run_id)
         selected_batches = run.get("selected_batches") or []
         companies_total_estimate = max(len(selected_batches), companies_scraped)
+        messages_generated = self._repository.count_outreach_for_run_by_status(
+            run_id=run_id,
+            status=OUTREACH_STATUS_DRAFT,
+        )
+        messages_sent = self._repository.count_outreach_for_run_by_status(
+            run_id=run_id,
+            status=OUTREACH_STATUS_SENT,
+        )
 
         return {
             "run_id": run["id"],
@@ -167,8 +177,8 @@ class RunService:
             "error_message": run.get("error_message"),
             "companies_scraped": companies_scraped,
             "companies_total_estimate": companies_total_estimate,
-            "messages_generated": 0,
-            "messages_sent": 0,
+            "messages_generated": messages_generated,
+            "messages_sent": messages_sent,
         }
 
     def _build_company_payload(
