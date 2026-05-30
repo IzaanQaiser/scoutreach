@@ -105,3 +105,21 @@ Phase 4 frontend is scaffolded under `/frontend` as a minimal Next.js app with a
 
 Reason:
 Closes the remaining Phase 4 wiring gap with explicit client-side state flow and test coverage for swipe-triggered API calls.
+
+---
+
+## 2026-05-30
+Decision:
+Phase 5 message generation is implemented as a dedicated backend service (`OutreachGenerationService`) behind `POST /runs/{run_id}/generate-messages`, with run-ownership checks, run-state guardrails, accepted-company filtering, and per-user daily generation quota enforcement.
+
+Reason:
+Keeps route handlers thin while enforcing server-side controls for generation eligibility and quota safety.
+
+---
+
+## 2026-05-30
+Decision:
+Generation failures now persist explicit `outreach` rows with `status=\"generation_failed\"` and `error_message`, while successful generations persist `status=\"draft\"`; run state advances through `messages_generating -> messages_generated`.
+
+Reason:
+Preserves debuggability and lifecycle clarity without dropping failed attempts.

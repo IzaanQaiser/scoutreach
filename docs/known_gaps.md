@@ -8,15 +8,15 @@
 - Migration files exist, but no migration runner CLI is wired yet; execution is manual via SQL tooling.
 
 ## Product Flow
-- Sending orchestration is not implemented yet (Phase 6+).
+- Outreach review/update/regenerate/send orchestration is not implemented yet (Phase 6+).
 
 ## Phase 2 Scraper
 - Current scraper integration is a deterministic stub in `backend/app/integrations/playwright_scraper.py`; real Playwright YC scraping is deferred.
 - Background task execution is in-process; no durable external worker/queue exists yet.
 
 ## Run API Surface
-- `POST /runs`, `GET /runs/{run_id}/status`, and Phase 4 company review endpoints are implemented; broader run listing/detail endpoints remain unimplemented.
+- `POST /runs`, `GET /runs/{run_id}/status`, Phase 4 company review endpoints, and `POST /runs/{run_id}/generate-messages` are implemented; broader run listing/detail endpoints remain unimplemented.
 
 ## Phase 3 Provider Integrations
-- Gemini dossier and Hunter enrichment clients are deterministic stubs for now; real provider API traffic, credentials, and retry/backoff tuning are deferred.
+- Gemini dossier/outreach and Hunter enrichment clients are deterministic stubs for now; real provider API traffic, credentials, and retry/backoff tuning are deferred.
 - Provider failure details are currently persisted in `companies.raw_scraped_data.provider_errors`; no dedicated provider-error table exists yet.
