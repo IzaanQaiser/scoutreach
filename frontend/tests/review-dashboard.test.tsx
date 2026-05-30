@@ -28,10 +28,14 @@ function makeCompany(overrides: Partial<Company>): Company {
 }
 
 describe("ReviewDashboard", () => {
+  const token = "test-token";
+  const onSignOut = vi.fn();
+
   beforeEach(() => {
     getRunCompanies.mockReset();
     getPendingCount.mockReset();
     updateCompanyStatus.mockReset();
+    onSignOut.mockReset();
   });
 
   it("loads pending queue and pending count for a run", async () => {
@@ -40,19 +44,19 @@ describe("ReviewDashboard", () => {
     ]);
     getPendingCount.mockResolvedValue(1);
 
-    render(<ReviewDashboard />);
+    render(<ReviewDashboard token={token} onSignOut={onSignOut} />);
 
     await userEvent.type(screen.getByLabelText("Run ID"), "run-123");
     await userEvent.click(screen.getByRole("button", { name: "Load Queue" }));
 
     await waitFor(() => {
-      expect(getRunCompanies).toHaveBeenCalledWith({
+      expect(getRunCompanies).toHaveBeenCalledWith(token, {
         runId: "run-123",
         status: "pending_review",
         limit: 100,
         offset: 0,
       });
-      expect(getPendingCount).toHaveBeenCalledWith({ runId: "run-123" });
+      expect(getPendingCount).toHaveBeenCalledWith(token, { runId: "run-123" });
     });
 
     expect(await screen.findByText("Alpha Co")).toBeInTheDocument();
@@ -70,7 +74,7 @@ describe("ReviewDashboard", () => {
       message: "Company status updated successfully",
     });
 
-    render(<ReviewDashboard />);
+    render(<ReviewDashboard token={token} onSignOut={onSignOut} />);
 
     await userEvent.type(screen.getByLabelText("Run ID"), "run-123");
     await userEvent.click(screen.getByRole("button", { name: "Load Queue" }));
@@ -80,7 +84,7 @@ describe("ReviewDashboard", () => {
     await userEvent.click(screen.getByRole("button", { name: "Accept" }));
 
     await waitFor(() => {
-      expect(updateCompanyStatus).toHaveBeenCalledWith({
+      expect(updateCompanyStatus).toHaveBeenCalledWith(token, {
         companyId: "company-1",
         status: "accepted",
       });
@@ -102,7 +106,7 @@ describe("ReviewDashboard", () => {
       message: "Company status updated successfully",
     });
 
-    render(<ReviewDashboard />);
+    render(<ReviewDashboard token={token} onSignOut={onSignOut} />);
 
     await userEvent.type(screen.getByLabelText("Run ID"), "run-555");
     await userEvent.click(screen.getByRole("button", { name: "Load Queue" }));
@@ -112,7 +116,7 @@ describe("ReviewDashboard", () => {
     await userEvent.click(screen.getByRole("button", { name: "Reject" }));
 
     await waitFor(() => {
-      expect(updateCompanyStatus).toHaveBeenCalledWith({
+      expect(updateCompanyStatus).toHaveBeenCalledWith(token, {
         companyId: "company-2",
         status: "rejected",
       });
