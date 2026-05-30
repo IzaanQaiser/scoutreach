@@ -15,7 +15,7 @@
 - Background task execution is in-process; no durable external worker/queue exists yet.
 
 ## Run API Surface
-- `POST /runs`, `GET /runs/{run_id}/status`, Phase 4 company review endpoints, and `POST /runs/{run_id}/generate-messages` are implemented; broader run listing/detail endpoints remain unimplemented.
+- Core run and outreach workflow endpoints are implemented through send (`POST /runs`, run status polling, company review, outreach generation, outreach review/regenerate, send-approved/single-send); broader run listing/detail endpoints remain unimplemented.
 
 ## Phase 3 Provider Integrations
 - Gemini dossier/outreach and Hunter enrichment clients are deterministic stubs for now; real provider API traffic, credentials, and retry/backoff tuning are deferred.
@@ -23,3 +23,6 @@
 
 ## Sending Safety
 - `send-approved` and single-send include quota checks plus retry/backoff for simulated transient failures, but provider throttling and fairness are process-local and not coordinated across replicas.
+
+## Regeneration History
+- Regeneration attempt metadata is now tracked in `outreach_regeneration_events`, but full message version history (before/after draft diffs) is still not modeled.

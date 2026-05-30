@@ -141,3 +141,21 @@ Send flows enforce approved-only status, per-user daily send quota checks, and p
 
 Reason:
 Maintains manual-review-first safety and preserves debuggable send state without introducing queue infrastructure mid-MVP.
+
+---
+
+## 2026-05-30
+Decision:
+Phase 7 introduces provider retry/backoff+jitter utilities and applies them across dossier generation, founder enrichment, message generation, regeneration, and sending, with bounded process-local throttling between provider calls.
+
+Reason:
+Improves public-beta resilience under transient provider 429/5xx failures while keeping implementation explicit and dependency-free.
+
+---
+
+## 2026-05-30
+Decision:
+Regeneration quota enforcement is implemented via a new `outreach_regeneration_events` table, and each regeneration request records one event before provider execution.
+
+Reason:
+Provides server-side daily regeneration quota tracking with durable, queryable attempt history instead of heuristics on mutable outreach rows.

@@ -23,6 +23,7 @@ Core tables:
 - `runs`
 - `companies`
 - `outreach`
+- `outreach_regeneration_events`
 - optional but recommended: `run_logs`
 
 ---
@@ -35,9 +36,12 @@ Core tables:
 users 1 -> 1 candidate_profile
 users 1 -> many runs
 users 1 -> many outreach
+users 1 -> many outreach_regeneration_events
 runs 1 -> many companies
 runs 1 -> many outreach
+runs 1 -> many outreach_regeneration_events
 companies 1 -> many outreach
+outreach 1 -> many outreach_regeneration_events
 ````
 
 ## Mermaid ERD
@@ -47,9 +51,12 @@ erDiagram
     USERS ||--|| CANDIDATE_PROFILE : "has exactly one profile"
     USERS ||--o{ RUNS : "starts many runs"
     USERS ||--o{ OUTREACH : "owns many outreach messages"
+    USERS ||--o{ OUTREACH_REGENERATION_EVENTS : "owns many regeneration events"
     RUNS ||--o{ COMPANIES : "contains many companies"
     RUNS ||--o{ OUTREACH : "generates many outreach drafts"
+    RUNS ||--o{ OUTREACH_REGENERATION_EVENTS : "contains regeneration events"
     COMPANIES ||--o{ OUTREACH : "receives many outreach messages"
+    OUTREACH ||--o{ OUTREACH_REGENERATION_EVENTS : "has regeneration attempts"
 
     USERS {
         uuid id PK
@@ -128,6 +135,14 @@ erDiagram
         timestamptz sent_at
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    OUTREACH_REGENERATION_EVENTS {
+        uuid id PK
+        uuid user_id FK
+        uuid run_id FK
+        uuid outreach_id FK
+        timestamptz created_at
     }
 ```
 
@@ -557,6 +572,36 @@ failed
 
 ---
 
+# Table: `outreach_regeneration_events`
+
+Tracks regeneration attempts for quota enforcement and audit visibility.
+
+## Purpose
+
+Each call to `POST /outreach/{outreach_id}/regenerate` stores one event row, including provider-failed attempts.
+
+This supports:
+
+* per-user daily regeneration quotas
+* low-overhead regeneration event tracing
+
+## Columns
+
+| Column        | Type          | Constraints                         | Description                        |
+| ------------- | ------------- | ----------------------------------- | ---------------------------------- |
+| `id`          | `uuid`        | PK, default `gen_random_uuid()`     | Event ID                           |
+| `user_id`     | `uuid`        | FK -> `users.id`, cascade delete    | Event owner                        |
+| `run_id`      | `uuid`        | FK -> `runs.id`, cascade delete     | Parent run                         |
+| `outreach_id` | `uuid`        | FK -> `outreach.id`, cascade delete | Related outreach row               |
+| `created_at`  | `timestamptz` | default `now()`                     | Regeneration attempt timestamp     |
+
+## Notes
+
+* This is event-level metadata, not full message version history.
+* Message content remains stored in `outreach`.
+
+---
+
 # Optional Table: `run_logs`
 
 Strongly recommended for public MVP debugging.
@@ -647,6 +692,9 @@ companies.run_id -> runs.id ON DELETE CASCADE
 outreach.user_id -> users.id ON DELETE CASCADE
 outreach.run_id -> runs.id ON DELETE CASCADE
 outreach.company_id -> companies.id ON DELETE CASCADE
+outreach_regeneration_events.user_id -> users.id ON DELETE CASCADE
+outreach_regeneration_events.run_id -> runs.id ON DELETE CASCADE
+outreach_regeneration_events.outreach_id -> outreach.id ON DELETE CASCADE
 run_logs.run_id -> runs.id ON DELETE CASCADE
 ```
 
@@ -713,6 +761,15 @@ create index idx_run_logs_level on run_logs(level);
 create index idx_run_logs_created_at on run_logs(created_at desc);
 ```
 
+## `outreach_regeneration_events`
+
+```sql
+create index idx_outreach_regen_events_user_created_at
+  on outreach_regeneration_events(user_id, created_at);
+create index idx_outreach_regen_events_outreach_id
+  on outreach_regeneration_events(outreach_id);
+```
+
 ---
 
 # Recommended Row Level Security Notes
@@ -730,6 +787,7 @@ users.id = auth.uid()
 candidate_profile.user_id = auth.uid()
 runs.user_id = auth.uid()
 outreach.user_id = auth.uid()
+outreach_regeneration_events.user_id = auth.uid()
 companies are accessible through runs.user_id = auth.uid()
 run_logs are accessible through runs.user_id = auth.uid()
 ```
