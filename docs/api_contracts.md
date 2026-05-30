@@ -167,12 +167,44 @@ Returns the authenticated user and profile setup status.
       "premium_status": false,
       "tokens_used": 0,
       "auto_send_enabled": false,
+      "first_name": "Izaan",
+      "last_name": "Ali",
+      "onboarding_status": "in_progress",
+      "onboarding_step": "targets",
+      "onboarding_completed_at": null,
       "message_preferences": {},
       "created_at": "2026-05-16T00:00:00Z",
       "updated_at": "2026-05-16T00:00:00Z"
     },
     "has_candidate_profile": true,
     "onboarding_complete": true
+  }
+}
+```
+
+---
+
+## `PATCH /me`
+
+Updates authenticated user identity fields used during onboarding.
+
+### Request Body
+
+```json
+{
+  "first_name": "Izaan",
+  "last_name": "Ali"
+}
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Profile updated successfully",
+    "onboarding_step": "profile_sources"
   }
 }
 ```
@@ -314,7 +346,153 @@ Updates user-level settings.
 
 ---
 
-# 5. Runs
+# 5. Onboarding
+
+## `GET /onboarding/state`
+
+Returns canonical onboarding routing state for the authenticated user.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "in_progress",
+    "step": "calibration",
+    "onboarding_complete": false,
+    "calibration_loop_count": 1,
+    "calibration_last_result": "partial_reject"
+  }
+}
+```
+
+---
+
+## `POST /onboarding/example-messages`
+
+Generates 5 calibration outreach examples for the current loop.
+
+### Request Body
+
+```json
+{
+  "loop_index": 0
+}
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "loop_index": 0,
+    "max_loops": 3,
+    "examples": [
+      {
+        "example_id": "loop-1-example-1",
+        "founder_name": "Founder 1",
+        "company_name": "Example Technology Co 1-1",
+        "target_role_context": "Software Engineer",
+        "industry_context": "technology",
+        "subject": "Short personalized subject",
+        "message_content": "Draft message body..."
+      }
+    ]
+  }
+}
+```
+
+---
+
+## `POST /onboarding/example-feedback`
+
+Submits rejects/feedback for the current loop.
+
+### Request Body
+
+```json
+{
+  "loop_index": 0,
+  "rejected_examples": [
+    {
+      "example_id": "loop-1-example-2",
+      "position_industry_feedback": "More backend-focused companies",
+      "subject_feedback": "Less generic subject line",
+      "body_feedback": "Mention open source work directly"
+    }
+  ]
+}
+```
+
+### Response (regenerated examples)
+
+```json
+{
+  "success": true,
+  "data": {
+    "loop_index": 1,
+    "max_loops": 3,
+    "message": "Generated a refreshed example set based on your feedback.",
+    "examples": []
+  }
+}
+```
+
+### Response (onboarding completed)
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Onboarding completed successfully",
+    "status": "completed",
+    "step": "done",
+    "onboarding_complete": true
+  }
+}
+```
+
+---
+
+## `POST /onboarding/complete`
+
+Allows explicit onboarding completion (including calibration skip).
+
+### Request Body
+
+```json
+{
+  "completion_mode": "skipped_calibration"
+}
+```
+
+`completion_mode` allowed values:
+
+```text
+completed
+completed_after_cap
+skipped_calibration
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Onboarding completed successfully",
+    "status": "skipped_calibration",
+    "step": "done",
+    "onboarding_complete": true
+  }
+}
+```
+
+---
+
+# 6. Runs
 
 ## `POST /runs`
 
@@ -449,7 +627,7 @@ Used by the frontend polling loop.
 
 ---
 
-# 6. Companies
+# 7. Companies
 
 ## `GET /runs/{run_id}/companies`
 
@@ -596,7 +774,7 @@ Returns how many companies still need review.
 
 ---
 
-# 7. Message Generation
+# 8. Message Generation
 
 ## `POST /runs/{run_id}/generate-messages`
 
@@ -657,7 +835,7 @@ INTERNAL_SERVER_ERROR
 
 ---
 
-# 8. Outreach Review
+# 9. Outreach Review
 
 ## `GET /runs/{run_id}/outreach`
 
@@ -840,7 +1018,7 @@ Returns counts for the review UI.
 
 ---
 
-# 9. Sending
+# 10. Sending
 
 ## Public MVP Rule
 
@@ -935,7 +1113,7 @@ Sends a single approved outreach message.
 
 ---
 
-# 10. Logs
+# 11. Logs
 
 ## `GET /runs/{run_id}/logs`
 
@@ -965,7 +1143,7 @@ Recommended for debugging scraper, Gemini, Hunter, and Gmail failures.
 
 ---
 
-# 11. Quotas / Rate Limits
+# 12. Quotas / Rate Limits
 
 ## Recommended MVP Limits
 
@@ -1013,7 +1191,7 @@ Returns quota usage for the authenticated user.
 
 ---
 
-# 12. Frontend Polling Contract
+# 13. Frontend Polling Contract
 
 The frontend should poll:
 
@@ -1038,7 +1216,7 @@ messages_generated
 
 ---
 
-# 13. Security Rules
+# 14. Security Rules
 
 The backend must enforce:
 
@@ -1053,17 +1231,22 @@ The backend must enforce:
 
 ---
 
-# 14. MVP Endpoint Checklist
+# 15. MVP Endpoint Checklist
 
 Required for first working MVP:
 
 ```text
 GET /health
 GET /me
+PATCH /me
 GET /candidate-profile
 PUT /candidate-profile
 GET /settings
 PATCH /settings
+GET /onboarding/state
+POST /onboarding/example-messages
+POST /onboarding/example-feedback
+POST /onboarding/complete
 POST /runs
 GET /runs
 GET /runs/{run_id}

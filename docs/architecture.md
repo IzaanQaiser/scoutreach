@@ -26,6 +26,42 @@ User profile setup
 
 ---
 
+### 1.1 Auth + Onboarding Flow
+
+Public MVP now includes explicit auth + onboarding gating before dashboard access.
+
+```text
+Landing (/)
+→ Auth (/auth; email/password or Google)
+→ Name step
+→ Profile sources step (resume/github/linkedin/portfolio)
+→ Targets step (roles + industry prefs)
+→ Message preferences step
+→ Calibration step (example swipes + optional feedback regeneration loop, max 3)
+→ Dashboard (/dashboard)
+```
+
+Route guard rules:
+
+- unauthenticated user: onboarding/dashboard redirect to `/auth`
+- authenticated + incomplete onboarding: dashboard redirects to saved onboarding step
+- authenticated + completed onboarding: onboarding routes redirect to `/dashboard`
+
+Backend endpoints used by this flow:
+
+- `GET /me`
+- `PATCH /me`
+- `GET /candidate-profile`
+- `PUT /candidate-profile`
+- `GET /settings`
+- `PATCH /settings`
+- `GET /onboarding/state`
+- `POST /onboarding/example-messages`
+- `POST /onboarding/example-feedback`
+- `POST /onboarding/complete`
+
+---
+
 ## 2. System Responsibilities
 
 ### User

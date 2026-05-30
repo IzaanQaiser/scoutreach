@@ -159,3 +159,21 @@ Regeneration quota enforcement is implemented via a new `outreach_regeneration_e
 
 Reason:
 Provides server-side daily regeneration quota tracking with durable, queryable attempt history instead of heuristics on mutable outreach rows.
+
+---
+
+## 2026-05-30
+Decision:
+Auth + onboarding is enforced with server-owned onboarding state (`users.onboarding_status`, `users.onboarding_step`) and dedicated onboarding calibration event tracking (`onboarding_calibration_events`) instead of client-only progress flags.
+
+Reason:
+Preserves resumable onboarding, prevents client-side completion spoofing, and enables quota/rate controls for calibration generation loops.
+
+---
+
+## 2026-05-30
+Decision:
+Frontend auth bootstrap tolerates missing Supabase browser env vars at build time and relies on explicit runtime checks before login/signup actions.
+
+Reason:
+Prevents local/build prerender failures while keeping production auth requirements explicit and debuggable.

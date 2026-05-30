@@ -20,6 +20,7 @@ Core tables:
 
 - `users`
 - `candidate_profile`
+- `onboarding_calibration_events`
 - `runs`
 - `companies`
 - `outreach`
@@ -34,6 +35,7 @@ Core tables:
 
 ```text
 users 1 -> 1 candidate_profile
+users 1 -> many onboarding_calibration_events
 users 1 -> many runs
 users 1 -> many outreach
 users 1 -> many outreach_regeneration_events
@@ -49,6 +51,7 @@ outreach 1 -> many outreach_regeneration_events
 ```mermaid
 erDiagram
     USERS ||--|| CANDIDATE_PROFILE : "has exactly one profile"
+    USERS ||--o{ ONBOARDING_CALIBRATION_EVENTS : "has onboarding calibration events"
     USERS ||--o{ RUNS : "starts many runs"
     USERS ||--o{ OUTREACH : "owns many outreach messages"
     USERS ||--o{ OUTREACH_REGENERATION_EVENTS : "owns many regeneration events"
@@ -64,6 +67,13 @@ erDiagram
         boolean premium_status
         integer tokens_used
         boolean auto_send_enabled
+        text first_name
+        text last_name
+        text onboarding_status
+        text onboarding_step
+        timestamptz onboarding_completed_at
+        integer calibration_loop_count
+        text calibration_last_result
         jsonb message_preferences
         timestamptz created_at
         timestamptz updated_at
@@ -85,6 +95,15 @@ erDiagram
         jsonb job_preferences
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    ONBOARDING_CALIBRATION_EVENTS {
+        uuid id PK
+        uuid user_id FK
+        text event_type
+        integer loop_index
+        jsonb feedback
+        timestamptz created_at
     }
 
     RUNS {
@@ -165,6 +184,13 @@ This table represents the authenticated user account. It should not store large 
 | `premium_status`      | `boolean`     | default `false`                 | Whether user has premium access       |
 | `tokens_used`         | `integer`     | default `0`                     | AI usage counter                      |
 | `auto_send_enabled`   | `boolean`     | default `false`                 | Whether user has opted into auto-send |
+| `first_name`          | `text`        | nullable                        | User first name                       |
+| `last_name`           | `text`        | nullable                        | User last name                        |
+| `onboarding_status`   | `text`        | default `'not_started'`         | Current onboarding completion status  |
+| `onboarding_step`     | `text`        | default `'auth'`                | Last completed/active onboarding step |
+| `onboarding_completed_at` | `timestamptz` | nullable                    | Timestamp of onboarding completion    |
+| `calibration_loop_count` | `integer`  | default `0`                     | Last completed calibration loop index |
+| `calibration_last_result` | `text`    | nullable                        | Last calibration completion/result    |
 | `message_preferences` | `jsonb`       | default `'{}'::jsonb`           | Global message style preferences      |
 | `created_at`          | `timestamptz` | default `now()`                 | Row creation timestamp                |
 | `updated_at`          | `timestamptz` | default `now()`                 | Last update timestamp                 |
@@ -188,6 +214,27 @@ This table represents the authenticated user account. It should not store large 
 * Public MVP should keep `auto_send_enabled=false` by default.
 * Even if the schema supports auto-send, public beta should require manual review before sending.
 * `message_preferences` stores user-level defaults. Per-run frozen copies should be stored in `runs.profile_snapshot`.
+* `onboarding_status` allowed values:
+
+```text
+not_started
+in_progress
+completed
+completed_after_cap
+skipped_calibration
+```
+
+* `onboarding_step` allowed values:
+
+```text
+auth
+name
+profile_sources
+targets
+message_preferences
+calibration
+done
+```
 
 ---
 
@@ -267,6 +314,32 @@ It answers:
 * `candidate_profile` is live user data.
 * When a user starts a run, copy the relevant candidate/profile/message preferences into `runs.profile_snapshot`.
 * This prevents old runs from changing when the user later edits their profile.
+
+---
+
+# Table: `onboarding_calibration_events`
+
+Stores onboarding calibration activity for quota enforcement and tuning history.
+
+## Purpose
+
+Tracks each calibration generation, feedback submission, and completion event during onboarding.
+
+## Columns
+
+| Column       | Type          | Constraints                          | Description                                           |
+| ------------ | ------------- | ------------------------------------ | ----------------------------------------------------- |
+| `id`         | `uuid`        | PK, default `gen_random_uuid()`      | Event ID                                              |
+| `user_id`    | `uuid`        | FK -> `users.id`, not null           | Event owner                                           |
+| `event_type` | `text`        | not null                             | `examples_generated`, `feedback_submitted`, etc.     |
+| `loop_index` | `integer`     | default `0`, check `loop_index >= 0` | Calibration loop index for the event                 |
+| `feedback`   | `jsonb`       | default `'{}'::jsonb`                | Structured user feedback or completion metadata       |
+| `created_at` | `timestamptz` | default `now()`                      | Event creation timestamp                              |
+
+## Notes
+
+* Phase 7 onboarding flow enforces per-user daily calibration limits using this table.
+* Events are append-only for auditable onboarding history.
 
 ---
 
