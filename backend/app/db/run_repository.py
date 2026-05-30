@@ -105,7 +105,34 @@ class RunRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def count_outreach_sent_today(self, *, user_id: str) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
     def get_outreach_for_run(self, *, run_id: str) -> list[dict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_outreach_for_run(
+        self,
+        *,
+        run_id: str,
+        status: str | None,
+        limit: int,
+        offset: int,
+    ) -> list[dict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_outreach(self, *, outreach_id: str) -> dict | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_outreach_for_user(self, *, outreach_id: str, user_id: str) -> dict | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_outreach(self, *, outreach_id: str, fields: dict) -> None:
         raise NotImplementedError
 
 
@@ -274,9 +301,57 @@ class InMemoryRunRepository(RunRepository):
                 for row in self._outreach
             )
 
+    def count_outreach_sent_today(self, *, user_id: str) -> int:
+        today = datetime.now(UTC).date()
+        with self._lock:
+            rows = [row for row in self._outreach if row["user_id"] == user_id and row.get("status") == "sent"]
+        return sum(
+            row.get("sent_at") is not None and datetime.fromisoformat(str(row["sent_at"])).date() == today
+            for row in rows
+        )
+
     def get_outreach_for_run(self, *, run_id: str) -> list[dict]:
         with self._lock:
             return [dict(row) for row in self._outreach if row["run_id"] == run_id]
+
+    def list_outreach_for_run(
+        self,
+        *,
+        run_id: str,
+        status: str | None,
+        limit: int,
+        offset: int,
+    ) -> list[dict]:
+        with self._lock:
+            rows = [dict(row) for row in self._outreach if row["run_id"] == run_id]
+
+        if status is not None:
+            rows = [row for row in rows if row.get("status") == status]
+
+        rows.sort(key=lambda row: str(row.get("created_at", "")))
+        return rows[offset : offset + limit]
+
+    def get_outreach(self, *, outreach_id: str) -> dict | None:
+        with self._lock:
+            for row in self._outreach:
+                if row["id"] == outreach_id:
+                    return dict(row)
+        return None
+
+    def get_outreach_for_user(self, *, outreach_id: str, user_id: str) -> dict | None:
+        with self._lock:
+            for row in self._outreach:
+                if row["id"] == outreach_id and row["user_id"] == user_id:
+                    return dict(row)
+        return None
+
+    def update_outreach(self, *, outreach_id: str, fields: dict) -> None:
+        with self._lock:
+            for row in self._outreach:
+                if row["id"] == outreach_id:
+                    row.update(fields)
+                    row["updated_at"] = _utc_now_iso()
+                    return
 
 
 def _rows(response: object) -> list[dict]:
@@ -437,6 +512,47 @@ class SupabaseRunRepository(RunRepository):
         )
         return len(rows)
 
+    def count_outreach_sent_today(self, *, user_id: str) -> int:
+        day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        rows = _rows(
+            self._client.table("outreach")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("status", "sent")
+            .gte("sent_at", day_start)
+            .execute()
+        )
+        return len(rows)
+
     def get_outreach_for_run(self, *, run_id: str) -> list[dict]:
         rows = _rows(self._client.table("outreach").select("*").eq("run_id", run_id).execute())
         return [dict(row) for row in rows]
+
+    def list_outreach_for_run(
+        self,
+        *,
+        run_id: str,
+        status: str | None,
+        limit: int,
+        offset: int,
+    ) -> list[dict]:
+        query = self._client.table("outreach").select("*").eq("run_id", run_id).order("created_at")
+        if status is not None:
+            query = query.eq("status", status)
+        if limit > 0:
+            query = query.range(offset, offset + limit - 1)
+        rows = _rows(query.execute())
+        return [dict(row) for row in rows]
+
+    def get_outreach(self, *, outreach_id: str) -> dict | None:
+        rows = _rows(self._client.table("outreach").select("*").eq("id", outreach_id).limit(1).execute())
+        return dict(rows[0]) if rows else None
+
+    def get_outreach_for_user(self, *, outreach_id: str, user_id: str) -> dict | None:
+        rows = _rows(
+            self._client.table("outreach").select("*").eq("id", outreach_id).eq("user_id", user_id).limit(1).execute()
+        )
+        return dict(rows[0]) if rows else None
+
+    def update_outreach(self, *, outreach_id: str, fields: dict) -> None:
+        self._client.table("outreach").update(fields).eq("id", outreach_id).execute()

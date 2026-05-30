@@ -10,15 +10,18 @@ from fastapi import FastAPI
 from app.api.routes.companies import router as companies_router
 from app.api.routes.health import router as health_router
 from app.api.routes.me import router as me_router
+from app.api.routes.outreach import router as outreach_router
 from app.api.routes.runs import router as runs_router
 from app.db.run_repository import InMemoryRunRepository, SupabaseRunRepository
 from app.db.supabase_client import build_supabase_client
 from app.integrations.gemini_client import GeminiDossierClient
+from app.integrations.gmail_client import GmailClient
 from app.integrations.hunter_client import HunterEmailClient
 from app.integrations.playwright_scraper import PlaywrightYcScraper
 from app.middleware.errors import register_error_handlers
 from app.services.company_service import CompanyService
 from app.services.outreach_generation_service import OutreachGenerationService
+from app.services.outreach_service import OutreachService
 from app.services.run_service import RunService
 from app.utils.settings import load_settings
 
@@ -36,6 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.scraper = PlaywrightYcScraper()
     app.state.gemini_client = GeminiDossierClient()
     app.state.hunter_client = HunterEmailClient()
+    app.state.gmail_client = GmailClient()
     app.state.run_service = RunService(
         repository=run_repository,
         scraper=app.state.scraper,
@@ -46,6 +50,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.outreach_generation_service = OutreachGenerationService(
         repository=run_repository,
         gemini_client=app.state.gemini_client,
+    )
+    app.state.outreach_service = OutreachService(
+        repository=run_repository,
+        gemini_client=app.state.gemini_client,
+        gmail_client=app.state.gmail_client,
     )
     yield
 
@@ -63,6 +72,7 @@ def create_app() -> FastAPI:
     app.include_router(me_router)
     app.include_router(runs_router)
     app.include_router(companies_router)
+    app.include_router(outreach_router)
 
     return app
 

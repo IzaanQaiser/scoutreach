@@ -151,3 +151,40 @@ class GeminiDossierClient:
                 "Best,\\nScoutReach User"
             ),
         }
+
+    def regenerate_outreach_draft(
+        self,
+        *,
+        company: dict,
+        founder: dict,
+        profile_snapshot: dict,
+        critique: str,
+        message_preferences_override: dict | None,
+    ) -> dict:
+        critique_text = critique.strip()
+        if "fail-regen" in critique_text.lower():
+            raise ProviderError(
+                code="GEMINI_FAILED",
+                provider="gemini",
+                message="Gemini regeneration failed (simulated).",
+            )
+
+        generated = self.generate_outreach_draft(
+            company=company,
+            founder=founder,
+            profile_snapshot=profile_snapshot,
+        )
+
+        tone = None
+        if isinstance(message_preferences_override, dict):
+            tone_value = message_preferences_override.get("tone")
+            if tone_value is not None:
+                tone = str(tone_value).strip()
+
+        tone_prefix = f"[{tone}] " if tone else ""
+        generated["subject"] = f"{tone_prefix}{generated['subject']}"
+        generated["message_content"] = (
+            f"{generated['message_content']}\\n\\n"
+            f"Critique applied: {critique_text or 'none'}"
+        )
+        return generated
