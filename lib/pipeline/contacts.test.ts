@@ -7,20 +7,25 @@ function fakeProvider(results: ContactSearchResult[]): ContactProvider {
   return {
     name: "fake",
     search: async () => results,
-    enrich: async () => {
-      throw new Error("enrich should not be called from fetchContacts (stage [5] only)");
+    verifyEmail: async () => {
+      throw new Error("verifyEmail should not be called from fetchContacts (stage [5] only)");
     },
   };
 }
 
 describe("fetchContacts", () => {
-  it("maps search results into contact rows with enrichment fields left null", async () => {
+  it("maps a full search result (Hunter-shaped) straight through, no deferred fields", async () => {
     const provider = fakeProvider([
       {
-        apolloId: "abc123",
+        providerId: null,
         first: "Jordan",
-        lastObfuscated: "Sm**h",
+        last: "Smith",
         title: "VP of Engineering",
+        seniority: "executive",
+        department: "engineering",
+        linkedin: "https://linkedin.com/in/jordansmith",
+        email: "jordan@example.com",
+        emailConfidence: 91,
         organizationName: "Example Co",
       },
     ]);
@@ -30,18 +35,38 @@ describe("fetchContacts", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       companyId: "company-1",
-      apolloId: "abc123",
       first: "Jordan",
-      last: null,
+      last: "Smith",
       title: "VP of Engineering",
-      seniority: null,
-      department: null,
-      linkedin: null,
-      tenureMonths: null,
-      email: null,
-      emailStatus: "not_fetched",
+      seniority: "executive",
+      department: "engineering",
+      linkedin: "https://linkedin.com/in/jordansmith",
+      email: "jordan@example.com",
+      emailStatus: "valid", // confidence 91 -> valid
+      emailSource: "fake",
       selected: false,
     });
+  });
+
+  it("maps confidence to emailStatus at the documented thresholds", async () => {
+    const provider = fakeProvider([
+      { providerId: null, first: "A", last: null, title: null, seniority: null, department: null, linkedin: null, email: "a@x.com", emailConfidence: 90, organizationName: null },
+      { providerId: null, first: "B", last: null, title: null, seniority: null, department: null, linkedin: null, email: "b@x.com", emailConfidence: 60, organizationName: null },
+      { providerId: null, first: "C", last: null, title: null, seniority: null, department: null, linkedin: null, email: "c@x.com", emailConfidence: 10, organizationName: null },
+    ]);
+
+    const rows = await fetchContacts(provider, "company-1", "example.com");
+    expect(rows.map((r) => r.emailStatus)).toEqual(["valid", "risky", "invalid"]);
+  });
+
+  it("leaves emailStatus not_fetched when a provider gives no email at search time", async () => {
+    const provider = fakeProvider([
+      { providerId: "abc", first: "Jordan", last: null, title: "VP of Engineering", seniority: null, department: null, linkedin: null, email: null, emailConfidence: null, organizationName: null },
+    ]);
+
+    const rows = await fetchContacts(provider, "company-1", "example.com");
+    expect(rows[0].emailStatus).toBe("not_fetched");
+    expect(rows[0].emailSource).toBeNull();
   });
 
   it("passes the engineering/leadership/talent title set to search", async () => {
@@ -52,7 +77,7 @@ describe("fetchContacts", () => {
         capturedTitles = titles;
         return [];
       },
-      enrich: async () => {
+      verifyEmail: async () => {
         throw new Error("not used");
       },
     };

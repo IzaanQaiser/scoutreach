@@ -9,7 +9,7 @@ function candidate(overrides: Partial<ContactCandidate> & { title: string }): Co
   return {
     id: crypto.randomUUID(),
     companyId: "company-1",
-    apolloId: crypto.randomUUID(),
+    providerId: crypto.randomUUID(),
     first: "Test",
     last: null,
     seniority: null,
@@ -57,13 +57,20 @@ describe("scoreContact", () => {
 
   it("applies the department bonus when title text matches a supplied keyword", () => {
     const c = candidate({ title: "VP of Engineering" });
-    expect(scoreContact(c, HEADCOUNT, { departmentKeywords: ["engineering"] })).toBe(90 + 15);
-    expect(scoreContact(c, HEADCOUNT, { departmentKeywords: ["sales"] })).toBe(90);
+    expect(scoreContact(c, HEADCOUNT, { targetDepartments: ["engineering"] })).toBe(90 + 15);
+    expect(scoreContact(c, HEADCOUNT, { targetDepartments: ["sales"] })).toBe(90);
   });
 
   it("defaults to no department bonus when no keywords are supplied", () => {
     const c = candidate({ title: "VP of Engineering" });
     expect(scoreContact(c, HEADCOUNT)).toBe(90);
+  });
+
+  it("prefers the real department field over title text when both are present", () => {
+    // Title alone doesn't mention "engineering", but Hunter's real
+    // `department` field does — the bonus must still apply.
+    const c = candidate({ title: "Head of Talent", department: "engineering" });
+    expect(scoreContact(c, HEADCOUNT, { targetDepartments: ["engineering"] })).toBe(40 + 15);
   });
 });
 
@@ -106,9 +113,9 @@ describe("rankContacts", () => {
 
   it("never selects more than one recruiter", () => {
     const pool = [
-      candidate({ title: "Technical Recruiter", apolloId: "r1" }),
-      candidate({ title: "Head of Talent", apolloId: "r2" }), // both classify as recruiter title text
-      candidate({ title: "VP of Engineering", apolloId: "v1" }),
+      candidate({ title: "Technical Recruiter", providerId: "r1" }),
+      candidate({ title: "Head of Talent", providerId: "r2" }), // both classify as recruiter title text
+      candidate({ title: "VP of Engineering", providerId: "v1" }),
     ];
     const selected = rankContacts(pool, 200);
     const recruiterCount = selected.filter((c) => isRecruiterTitle(c.title ?? "")).length;
@@ -117,10 +124,10 @@ describe("rankContacts", () => {
 
   it("never selects two contacts with the identical title", () => {
     const pool = [
-      candidate({ title: "Senior Engineer", apolloId: "1" }),
-      candidate({ title: "Senior Engineer", apolloId: "2" }),
-      candidate({ title: "Senior Engineer", apolloId: "3" }),
-      candidate({ title: "CTO", apolloId: "4" }),
+      candidate({ title: "Senior Engineer", providerId: "1" }),
+      candidate({ title: "Senior Engineer", providerId: "2" }),
+      candidate({ title: "Senior Engineer", providerId: "3" }),
+      candidate({ title: "CTO", providerId: "4" }),
     ];
     const selected = rankContacts(pool, 30);
     const titles = selected.map((c) => c.title);
@@ -129,9 +136,9 @@ describe("rankContacts", () => {
 
   it("includes the naturally-highest-scoring budget-owner when top-N already contains one", () => {
     const pool = [
-      candidate({ title: "Senior Engineer", apolloId: "1" }), // 55
-      candidate({ title: "Staff Engineer", apolloId: "2" }), // 65
-      candidate({ title: "Director of Engineering", apolloId: "3" }), // 80, budget owner
+      candidate({ title: "Senior Engineer", providerId: "1" }), // 55
+      candidate({ title: "Staff Engineer", providerId: "2" }), // 65
+      candidate({ title: "Director of Engineering", providerId: "3" }), // 80, budget owner
     ];
     const selected = rankContacts(pool, 30);
     expect(selected.map((c) => c.title)).toEqual(["Director of Engineering", "Staff Engineer"]);
@@ -142,12 +149,12 @@ describe("rankContacts", () => {
     // one budget-owner in the pool on raw score alone — the selection
     // rule still requires >=1 budget-owner, so it must swap one in.
     const pool = [
-      candidate({ title: "Senior Engineer", apolloId: "1" }), // 55 + 15 = 70
-      candidate({ title: "Staff Engineer", apolloId: "2" }), // 65 + 15 = 80
-      candidate({ title: "Engineering Manager", apolloId: "3" }), // 70, budget owner, no keyword match
+      candidate({ title: "Senior Engineer", providerId: "1" }), // 55 + 15 = 70
+      candidate({ title: "Staff Engineer", providerId: "2" }), // 65 + 15 = 80
+      candidate({ title: "Engineering Manager", providerId: "3" }), // 70, budget owner, no keyword match
     ];
     const selected = rankContacts(pool, 30, {
-      departmentKeywords: ["senior", "staff", "principal"],
+      targetDepartments: ["senior", "staff", "principal"],
     });
 
     expect(selected).toHaveLength(2);
@@ -156,8 +163,8 @@ describe("rankContacts", () => {
 
   it("degrades gracefully (no throw) when no budget-owner exists in the pool at all", () => {
     const pool = [
-      candidate({ title: "Senior Engineer", apolloId: "1" }),
-      candidate({ title: "Staff Engineer", apolloId: "2" }),
+      candidate({ title: "Senior Engineer", providerId: "1" }),
+      candidate({ title: "Staff Engineer", providerId: "2" }),
     ];
     expect(() => rankContacts(pool, 30)).not.toThrow();
     const selected = rankContacts(pool, 30);

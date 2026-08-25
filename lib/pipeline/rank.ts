@@ -8,18 +8,23 @@
 //         +  8 if public footprint exists   (GitHub, blog, talks — gives you a hook)
 //         - 20 if title is recruiter AND headcount < 120
 //
-// ADAPTED (confirmed with user 2026-08-25): Apollo's free People Search
-// (stage [5]) doesn't return seniority/department/linkedin/tenure —
-// verified against Apollo's API schema, see ../providers/contact-provider.ts.
-// Those fields only exist after enrich() (stage [7]), which must run
-// AFTER ranking/selection, not before. So this implementation:
-// - computes title_weight from the title STRING (still fully available)
-// - approximates the department bonus from title text too, when the
-//   caller supplies domain keywords (e.g. ["engineering"]) — optional,
-//   since the real source (Phase 4's project data) doesn't exist yet
-// - drops the tenure term entirely (unknown pre-enrichment, no proxy)
-// - drops the public-footprint term entirely (no data source in scope)
-// - keeps the recruiter penalty (title text is enough to detect it)
+// ADAPTED: Apollo (spec's original provider) turned out to have no free
+// API access at all, so the default provider is now Hunter.io (see
+// ../providers/hunter-provider.ts) — confirmed against Hunter's real V2
+// API that its search DOES return seniority/department/linkedin
+// directly, no separate enrichment step needed (verified 2026-08-25).
+// Only tenure genuinely isn't available from any provider in scope:
+// - title_weight: from the title string, as originally specified
+// - department bonus: uses the real `department` field when a provider
+//   supplies it (Hunter); falls back to matching caller-supplied
+//   keywords against the title string when it's null (e.g. a provider
+//   that doesn't return department, or Phase 4's project-domain data
+//   once that exists)
+// - tenure: dropped entirely — no provider in scope returns it, and the
+//   spec's own ordering rule (rank before you spend on enrichment) rules
+//   out fetching it just to compute this term
+// - public footprint: dropped, no data source in scope
+// - recruiter penalty: unchanged, title text is enough to detect it
 //
 // title_weight:
 //   CTO / technical co-founder        100
@@ -72,23 +77,25 @@ export function isRecruiterTitle(title: string): boolean {
 }
 
 export interface ScoreOptions {
-  // Optional proxy for the spec's "department matches strongest project's
-  // domain" — matched against the title string. Real source (Phase 4
-  // project data) doesn't exist yet, so this defaults to no bonus.
-  departmentKeywords?: string[];
+  // Domain(s) that should earn the department bonus, e.g. ["engineering"].
+  // Checked against the real `department` field first (Hunter supplies
+  // this); if that's null, falls back to matching these keywords against
+  // the title string instead. Defaults to no bonus if neither is available.
+  targetDepartments?: string[];
 }
 
 export function scoreContact(
   candidate: ContactCandidate,
   headcount: number,
-  { departmentKeywords = [] }: ScoreOptions = {},
+  { targetDepartments = [] }: ScoreOptions = {},
 ): number {
   const title = candidate.title ?? "";
   const { weight } = classify(title);
 
   let score = weight;
 
-  if (departmentKeywords.some((kw) => title.toLowerCase().includes(kw.toLowerCase()))) {
+  const departmentSource = (candidate.department || title).toLowerCase();
+  if (targetDepartments.some((kw) => departmentSource.includes(kw.toLowerCase()))) {
     score += DEPARTMENT_BONUS;
   }
 

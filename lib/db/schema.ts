@@ -53,7 +53,10 @@ export const contacts = sqliteTable("contacts", {
   companyId: text("company_id")
     .notNull()
     .references(() => companies.id, { onDelete: "cascade" }),
-  apolloId: text("apollo_id"),
+  // Not every provider has a stable person ID (Hunter doesn't); null when
+  // there isn't one. Was apollo_id — renamed once the default provider
+  // changed (Apollo's free plan has no API access; see contact-provider.ts).
+  providerId: text("provider_id"),
   first: text("first"),
   last: text("last"),
   title: text("title"),

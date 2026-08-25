@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "90b0b298-4b6b-416a-9c84-5b93170c71ff",
+  "id": "e269475c-a8bd-4899-9981-1fc88fa68515",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "companies": {
@@ -240,8 +240,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "apollo_id": {
-          "name": "apollo_id",
+        "provider_id": {
+          "name": "provider_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

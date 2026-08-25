@@ -31,7 +31,7 @@ function company(overrides: Partial<Company> & { id: string; name: string }): Co
 
 function contact(overrides: Partial<Contact> & { id: string; companyId: string }): Contact {
   return {
-    apolloId: null,
+    providerId: null,
     first: null,
     last: null,
     title: null,

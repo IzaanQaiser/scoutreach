@@ -1,18 +1,19 @@
 // Stage [5] — spec §9 / §9.1.
 //
-// Apollo People Search only (`ContactProvider.search`, see
-// ../providers/contact-provider.ts and ../providers/apollo-provider.ts).
-// 0 credits — safe to pull the full title-target set per company without
-// worrying about quota. Do NOT call enrichment here; that's stage [7],
-// after ranking (§0.3, §6) — search only returns an obfuscated last name
-// and no seniority/department/linkedin/tenure (verified against Apollo's
-// API schema; see contact-provider.ts), so persisted rows start with
-// those fields null and get filled in only for the ranked/selected
-// contacts, later.
+// ContactProvider.search (see ../providers/contact-provider.ts and
+// ../providers/hunter-provider.ts) — must stay free/0-cost. Hunter's
+// domain-search returns the full profile (name/title/seniority/
+// department/linkedin/email/confidence) in this one call, so unlike the
+// Apollo-shaped design this used to have, most fields are populated
+// immediately rather than deferred to a separate enrichment step.
+// verifyEmail (stage [7]) still only runs on the ranked/selected set —
+// its job now is confirming deliverability, not fetching the profile.
 //
 // Filter person_titles on engineering + leadership + talent per spec
-// §9.1. Free-tier limits (600/day) are not a constraint at this volume
-// (~115 companies).
+// §9.1. Free-tier limits (Hunter: 50 credits/month, shared across
+// search+verify) are the real constraint at ~115 companies — pace
+// accordingly, this isn't a "run once" free-for-all like Apollo's
+// (unusable) free search would have been.
 
 import type { InferInsertModel } from "drizzle-orm";
 
@@ -21,8 +22,8 @@ import type { ContactProvider } from "../providers/contact-provider";
 
 export type ContactRow = InferInsertModel<typeof contacts>;
 
-// Engineering + leadership + talent, per spec §9.1. Kept here (not in the
-// provider) since it's a pipeline-stage decision, not an Apollo detail.
+// Engineering + leadership + talent, per spec §9.1. Kept here (not in a
+// provider) since it's a pipeline-stage decision, not a provider detail.
 export const TARGET_TITLES = [
   "Chief Technology Officer",
   "Co-Founder",
@@ -37,6 +38,16 @@ export const TARGET_TITLES = [
   "Head of Talent",
 ];
 
+// Provider-reported confidence -> our emailStatus vocabulary, only used
+// when a provider gives an email at search time (Hunter) rather than
+// waiting for a separate verify step.
+function statusFromConfidence(confidence: number | null): ContactRow["emailStatus"] {
+  if (confidence === null) return "not_fetched";
+  if (confidence >= 80) return "valid";
+  if (confidence >= 50) return "risky";
+  return "invalid";
+}
+
 export async function fetchContacts(
   provider: ContactProvider,
   companyId: string,
@@ -47,19 +58,17 @@ export async function fetchContacts(
   return results.map((result) => ({
     id: crypto.randomUUID(),
     companyId,
-    apolloId: result.apolloId,
-    first: result.first || null,
-    // last name is obfuscated at search time; real value only exists
-    // after enrich() runs on a ranked/selected contact.
-    last: null,
-    title: result.title || null,
-    seniority: null,
-    department: null,
-    linkedin: null,
-    tenureMonths: null,
-    email: null,
-    emailStatus: "not_fetched",
-    emailSource: null,
+    providerId: result.providerId,
+    first: result.first,
+    last: result.last,
+    title: result.title,
+    seniority: result.seniority,
+    department: result.department,
+    linkedin: result.linkedin,
+    tenureMonths: null, // no provider in scope supplies this; dropped from rank.ts too
+    email: result.email,
+    emailStatus: result.email ? statusFromConfidence(result.emailConfidence) : "not_fetched",
+    emailSource: result.email ? provider.name : null,
     rankScore: null,
     selected: false,
     skipReason: null,

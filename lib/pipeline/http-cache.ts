@@ -1,9 +1,10 @@
 // Rate-limited, disk-cached HTTP calls. Shared by scrape.ts/evidence.ts
-// (GET + HTML via cachedFetch) and contacts.ts's Apollo provider (POST +
-// JSON via cachedJsonCall) — both need "cache raw responses so re-runs
-// cost nothing" and "respect rate limits" (spec §9.1, §13). Caching a
-// paid Apollo enrichment call matters even more than a free HTML fetch:
-// a rerun must never accidentally re-spend credits.
+// (GET + HTML via cachedFetch) and the contact providers under
+// ../providers (POST + JSON via cachedJsonCall) — both need "cache raw
+// responses so re-runs cost nothing" and "respect rate limits" (spec
+// §9.1, §13). Caching matters even more here: a free-plan provider's
+// monthly credit cap makes a repeated call genuinely costly, not just
+// slow.
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

@@ -34,7 +34,7 @@ CREATE TABLE `company_evidence` (
 CREATE TABLE `contacts` (
 	`id` text PRIMARY KEY NOT NULL,
 	`company_id` text NOT NULL,
-	`apollo_id` text,
+	`provider_id` text,
 	`first` text,
 	`last` text,
 	`title` text,
