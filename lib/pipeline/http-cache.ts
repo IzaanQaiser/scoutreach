@@ -1,7 +1,9 @@
-// Rate-limited, disk-cached HTTP GET. Shared by scrape.ts and evidence.ts —
-// both need "cache raw responses so re-runs cost nothing" and "respect
-// rate limits" (spec §9.1, §13). Extracted here rather than duplicated
-// because both stages need it verbatim.
+// Rate-limited, disk-cached HTTP calls. Shared by scrape.ts/evidence.ts
+// (GET + HTML via cachedFetch) and contacts.ts's Apollo provider (POST +
+// JSON via cachedJsonCall) — both need "cache raw responses so re-runs
+// cost nothing" and "respect rate limits" (spec §9.1, §13). Caching a
+// paid Apollo enrichment call matters even more than a free HTML fetch:
+// a rerun must never accidentally re-spend credits.
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -12,9 +14,14 @@ const USER_AGENT =
 
 let lastRequestAt = 0;
 
-function cachePathFor(cacheDir: string, namespace: string, url: string): string {
-  const hash = createHash("sha256").update(url).digest("hex");
-  return path.join(cacheDir, namespace, `${hash}.html`);
+function cachePathFor(
+  cacheDir: string,
+  namespace: string,
+  key: string,
+  extension: string,
+): string {
+  const hash = createHash("sha256").update(key).digest("hex");
+  return path.join(cacheDir, namespace, `${hash}.${extension}`);
 }
 
 async function waitForRateLimit(minIntervalMs: number): Promise<void> {
@@ -26,7 +33,7 @@ async function waitForRateLimit(minIntervalMs: number): Promise<void> {
   lastRequestAt = Date.now();
 }
 
-export interface CachedFetchOptions {
+export interface CacheOptions {
   namespace: string;
   minIntervalMs?: number;
   // Read at call time (not module load) so per-call/per-test overrides
@@ -44,9 +51,9 @@ export async function cachedFetch(
     namespace,
     minIntervalMs = 2000,
     cacheDir = process.env.SCOUTREACH_CACHE_DIR ?? ".cache",
-  }: CachedFetchOptions,
+  }: CacheOptions,
 ): Promise<string> {
-  const cachePath = cachePathFor(cacheDir, namespace, url);
+  const cachePath = cachePathFor(cacheDir, namespace, url, "html");
 
   try {
     return await readFile(cachePath, "utf-8");
@@ -68,4 +75,39 @@ export async function cachedFetch(
   await writeFile(cachePath, html, "utf-8");
 
   return html;
+}
+
+// Returns a cached JSON-serializable result for cacheKey if present;
+// otherwise rate-limits and calls fetcher(), caching its result. Unlike
+// cachedFetch this doesn't make the HTTP call itself — callers own their
+// own request (POST body/headers vary too much across APIs to abstract
+// usefully) but get the same "never repeat a call, never skip the rate
+// limit" guarantee, which matters more here since a repeated call can
+// mean repeated credit spend, not just a wasted request.
+export async function cachedJsonCall<T>(
+  cacheKey: string,
+  {
+    namespace,
+    minIntervalMs = 2000,
+    cacheDir = process.env.SCOUTREACH_CACHE_DIR ?? ".cache",
+  }: CacheOptions,
+  fetcher: () => Promise<T>,
+): Promise<T> {
+  const cachePath = cachePathFor(cacheDir, namespace, cacheKey, "json");
+
+  try {
+    const cached = await readFile(cachePath, "utf-8");
+    return JSON.parse(cached) as T;
+  } catch {
+    // not cached — fall through to fetch
+  }
+
+  await waitForRateLimit(minIntervalMs);
+
+  const result = await fetcher();
+
+  await mkdir(path.dirname(cachePath), { recursive: true });
+  await writeFile(cachePath, JSON.stringify(result), "utf-8");
+
+  return result;
 }
