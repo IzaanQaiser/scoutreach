@@ -1,14 +1,28 @@
-// v0.1 UI target — spec §12: "no UI beyond a sortable table."
-// Wire this up to `db.select().from(companies)` (../../lib/db/client.ts,
-// ../../lib/db/schema.ts) once the scrape/evidence/contact/rank pipeline
-// stages are implemented and there's data to show.
+import { db } from "../../lib/db/client";
+import { companies } from "../../lib/db/schema";
+import { CompaniesTable } from "./companies-table";
 
-export default function CompaniesPage() {
+// This is a local-only tool reading a live SQLite file that may not
+// exist yet at build time (before migrations run) — never prerender it.
+export const dynamic = "force-dynamic";
+
+export default async function CompaniesPage() {
+  const rows = await db
+    .select({
+      id: companies.id,
+      name: companies.name,
+      domain: companies.domain,
+      tier: companies.tier,
+      headcount: companies.headcount,
+      status: companies.status,
+    })
+    .from(companies);
+
   return (
     <main className="page">
       <section className="panel">
         <h1>Companies</h1>
-        <p>No data yet — run the pipeline once stages [1]-[6] are implemented.</p>
+        <CompaniesTable companies={rows} />
       </section>
     </main>
   );
