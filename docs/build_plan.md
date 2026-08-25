@@ -95,45 +95,52 @@ real scraped companies, not fixtures.
 
 ## Phase 3 — Contacts, ranking, v0.1 export · v0.1 milestone
 
-**Builds:** Apollo People Search + Enrichment provider (`lib/providers/
-apollo-provider.ts`), contact fetch (`lib/pipeline/contacts.ts`, stage
-[5]), rank scoring (`lib/pipeline/rank.ts`, stage [6]), CSV export
-(`lib/pipeline/export.ts`), `/app/companies` sortable table.
+**Builds:** contact provider (`lib/providers/hunter-provider.ts`),
+contact fetch (`lib/pipeline/contacts.ts`, stage [5]), rank scoring
+(`lib/pipeline/rank.ts`, stage [6]), CSV export (`lib/pipeline/
+export.ts`), `/app/companies` sortable table.
 
-Verified directly against Apollo's published API schema (2026-08-25),
-not assumed from the spec: the free 0-credit search endpoint
-(`POST /mixed_people/api_search`) returns far less than a first read of
-spec §0.3 implies — only `id`/`first_name`/an **obfuscated** last name/
-`title`/`organization.name`. No seniority, department, linkedin, or
-tenure. Those only come from enrichment (`POST /people/match`, costs
-credits), which per spec's own ordering rule must run *after* ranking —
-so the rank formula's tenure term can't be computed at rank time at all.
+**Provider swap, mid-phase:** spec §0.3's original choice, Apollo, turned
+out to have no free API access at all — confirmed directly in the user's
+own account (Free/Basic are UI-only; raw API access needs a paid plan,
+~$79-99/mo). Rather than pay for it, swapped to Hunter.io, which was v1's
+original provider and does have genuine free API access (verified
+against Hunter's own V2 docs, not assumed — a first fetch landed on
+stale V1 docs that claimed no name/title fields existed at all).
 
-**Confirmed with user:** rank on title text alone (title_weight +
-title-derived department-keyword bonus + recruiter penalty), drop the
-tenure term entirely rather than spend enrichment credits on unranked
-candidates to recover it. `rank.ts` documents the full original formula
-and exactly what changed and why.
+This ended up being a net improvement, not just a free substitute:
+Hunter's `domain-search` endpoint returns name, title, seniority,
+department, linkedin, email, and confidence **all in one free call** —
+richer than Apollo's free tier would have given even with its paid
+enrichment step. `rank.ts`'s department bonus now uses the real
+`department` field when present (falling back to title-text matching
+only when it's null), which is closer to the original spec formula than
+the Apollo-era workaround was. Tenure is still dropped — no provider in
+scope returns it, and spec's own ordering rule (rank before spending on
+enrichment) rules out fetching it just for this term.
 
-Enrichment (stage [7]) is implemented in `apollo-provider.ts` and cached
-(a rerun must never re-spend credits) but is **not called from the
-pipeline yet** — still blocked on the Apollo credit-pool question from
-Phase 1 (§14). `contacts.ts` persists rows with `last`/`seniority`/
-`department`/`linkedin`/`tenureMonths`/`email` all null until that's
-resolved and enrichment is wired in for the selected set.
+`ContactProvider`'s interface changed shape accordingly: `search` now
+returns the full profile a provider is willing to give upfront (not just
+an obfuscated stub), and the paid step is renamed `verifyEmail` — stage
+[7] is really "email + verify" per the spec's own name for it, not a
+second profile-fetch. Contact IDs are provider-optional (`providerId:
+string | null`) since Hunter doesn't have one; email is the durable
+cross-provider key. `contacts.providerId` (was `apollo_id`) renamed to
+match — regenerated migration 0000 fresh rather than layering a rename
+on top of a migration nobody's run against real data yet.
 
-Also extended `http-cache.ts` with `cachedJsonCall` (POST/JSON, alongside
-the existing GET/HTML `cachedFetch`) — a real second consumer, not
-speculative, and caching a paid enrichment call matters more than a free
-HTML fetch.
+`apollo-provider.ts` removed outright (not kept as a dead alternative) —
+the user explicitly rejected paying for it, so there was nothing to keep
+it in sync with the new interface for.
 
 **Tests**
-- unit: Apollo provider request shape (endpoint, `x-api-key` header,
-  body) and response mapping for both search and enrich, including a
-  cache-hit test asserting zero network calls (i.e. zero re-spent
-  credits) on a repeat enrich call
+- unit: Hunter provider request shape (endpoint, query params) and
+  response mapping for both `search` and `verifyEmail`, including title
+  filtering behavior and a cache-hit test asserting zero network calls
+  (i.e. zero re-spent monthly credits) on a repeat call
 - unit: rank formula against a fixed input→score table covering every
-  `title_weight` tier and every modifier
+  `title_weight` tier and every modifier, plus a case proving the real
+  `department` field is preferred over the title-text fallback
 - unit: selection rule (≥1 budget-owner, ≤1 recruiter, no duplicate
   titles), including a constructed case where the natural top-N excludes
   the only budget-owner and the swap-in logic has to recover it, and the
@@ -145,11 +152,13 @@ HTML fetch.
   null-handling) without throwing, toggles direction on repeat clicks
 
 **Pass criteria:** selection rule holds in the constructed edge cases
-above; CSV/table pass criteria met (all implemented and green, 75/75
+above; CSV/table pass criteria met (all implemented and green, 85/85
 tests project-wide). **v0.1 exit gate (spec §12)** — running this for
 real (115 companies, ~1,500 contacts, ~300 selected) is still blocked on
-the same two open items as Phase 1: which industries to target, and the
-Apollo credit-pool check.
+the industries pick (spec §14), and now paced by Hunter's free-plan
+monthly credit cap (50/mo, shared across search+verify) rather than
+Apollo's per-call cost model — expect this to take a few monthly cycles
+to fully cover 115 companies unless the user upgrades Hunter later.
 
 ---
 
