@@ -57,18 +57,39 @@ above are implemented and green (13/13 tests) as of this phase.
 
 ## Phase 2 — Evidence crawl (stage [2]) · v0.1
 
-**Builds:** per-company crawl of blog/changelog/docs/careers/engineering/
-GitHub/news; stores url + title + exact snippet + `retrieved_at`.
+**Builds:** per-company crawl of `/blog`, `/changelog`, `/docs`,
+`/careers`, `/engineering` off the company's own domain, plus its GitHub
+org when known. Stores url + title + exact snippet + `retrieved_at`.
+Implemented in `lib/pipeline/evidence.ts`, sharing the rate-limited disk
+cache from Phase 1 (`http-cache.ts`).
+
+"Recent news" (the 6th source in §9.1) is deliberately not implemented —
+it needs a search provider (news API or Google News RSS), a separate
+decision, not a direct fetch like the rest of this stage. Left as a TODO
+in the module; doesn't block the rest of the phase.
+
+Verified directly against a real site (2026-08-25, avoca.ai): modern
+startup sites are often Next.js/React SPAs, but content is still
+server-rendered into the initial HTML — plain fetch + strip noise tags +
+read visible text works without a headless browser. 3 of 5 direct paths
+resolved on that real site, confirming per-path failures are the normal
+case, not an edge case.
 
 **Tests**
-- unit: snippet extraction on fixture HTML — asserts exact substring, not
-  paraphrase
-- integration: unreachable page for one company doesn't crash the batch;
-  company ends up flagged, not silently skipped (§2 rule 4)
+- unit: snippet extraction on a real trimmed fixture (verbatim substring,
+  not paraphrased) plus synthetic noise-stripping and empty-page cases
+- unit: `crawlEvidence` skips 404s without throwing; includes a GitHub
+  org row when provided
+- integration: a company whose fetch throws (DNS/connection failure)
+  doesn't stop the batch — `crawlEvidenceForCompanies` still processes
+  the rest and flags the failed one via `evidenceStatusFor`
 
-**Pass criteria:** ≥3 evidence rows for ≥80% of quality-bar-passing
-companies; 100% of rows have a resolvable URL and non-empty snippet;
-zero-evidence companies are flagged in `companies.status`, never dropped.
+**Pass criteria:** 100% of rows have a resolvable URL and non-empty
+snippet (enforced structurally — empty extractions are never persisted);
+zero-evidence companies get `status="needs_evidence"`, never dropped.
+All implemented and green (8/8 new tests). The "≥3 rows for ≥80% of
+companies" volume target can only be measured once Phase 1 runs against
+real scraped companies, not fixtures.
 
 ---
 
