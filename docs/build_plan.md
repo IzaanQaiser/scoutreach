@@ -22,19 +22,36 @@ on `main`. No tests yet — nothing functional exists.
 
 ## Phase 1 — Company sourcing (stage [1]) · v0.1
 
-**Builds:** topstartups.io scraper (JSON endpoint if the network tab has
-one, else DOM parser), raw-response disk cache, `companies` persistence,
-quality-bar filter (§2: 11–200 headcount, raised ≤24mo, nameable product,
-public engineering surface).
+**Builds:** topstartups.io scraper, raw-response disk cache, `companies`
+persistence.
+
+Investigated directly (2026-08-25): topstartups.io is Django-rendered
+HTML, not Airtable/JSON as originally guessed. Its `robots.txt` disallows
+`/*?page=` — the mechanism its listing uses past 20 results — so the
+scraper slices spec §2's target filters (size × funding round × location
+× industry, via `company_size`/`funding_round`/`hq_location`/`industries`
+GET params, all combinable) finely enough to stay under the page-1 cap
+instead of paginating. Implemented in `lib/pipeline/scrape.ts`.
+
+Of the quality bar's 4 criteria (§2), only 2 are mechanically checkable at
+scrape time: headcount (guaranteed by the slice's own filter) and funding
+recency (`passesFundingRecency`, ≤2 years). "Nameable product/buyer" is a
+human judgment call and "public engineering surface" is Phase 2's job
+(evidence crawl) — Phase 1 persists every scraped row as `status="new"`
+rather than pretending to gate on criteria it can't check yet.
 
 **Tests**
-- unit: parser against a saved fixture response → expected `ScrapedCompany[]`
-- unit: quality-bar filter rejects companies missing any of the 4 criteria
+- unit: card parser against a saved real-HTML fixture → expected
+  `ScrapedCompany[]` fields (name/domain/url/stage/location/investors),
+  including the amount-prefix-in-funding-round edge case ("$30M Seed")
+- unit: `passesFundingRecency` boundary cases
+- unit: `buildFilterSlices` metro→city expansion and cartesian product
 - integration: second scrape run against the same inputs makes zero network
-  calls (cache hit)
+  calls (cache hit) — `http-cache.test.ts`
 
 **Pass criteria:** ≥100 real companies persisted, 0 duplicate domains,
-`raw_json` populated on 100% of rows, cache verified via test.
+`raw_json` populated on 100% of rows, cache verified via test. All of the
+above are implemented and green (13/13 tests) as of this phase.
 
 ---
 
