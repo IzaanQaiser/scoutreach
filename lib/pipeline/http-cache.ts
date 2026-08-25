@@ -1,21 +1,20 @@
-// Rate-limited, disk-cached HTTP GET. Shared by scrape.ts and (later)
-// evidence.ts — both need "cache raw responses so re-runs cost nothing"
-// and "respect rate limits" (spec §9.1, §13). Extracted here rather than
-// duplicated because both stages need it verbatim.
+// Rate-limited, disk-cached HTTP GET. Shared by scrape.ts and evidence.ts —
+// both need "cache raw responses so re-runs cost nothing" and "respect
+// rate limits" (spec §9.1, §13). Extracted here rather than duplicated
+// because both stages need it verbatim.
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const CACHE_DIR = process.env.SCOUTREACH_CACHE_DIR ?? ".cache";
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
 
 let lastRequestAt = 0;
 
-function cachePathFor(namespace: string, url: string): string {
+function cachePathFor(cacheDir: string, namespace: string, url: string): string {
   const hash = createHash("sha256").update(url).digest("hex");
-  return path.join(CACHE_DIR, namespace, `${hash}.html`);
+  return path.join(cacheDir, namespace, `${hash}.html`);
 }
 
 async function waitForRateLimit(minIntervalMs: number): Promise<void> {
@@ -30,15 +29,24 @@ async function waitForRateLimit(minIntervalMs: number): Promise<void> {
 export interface CachedFetchOptions {
   namespace: string;
   minIntervalMs?: number;
+  // Read at call time (not module load) so per-call/per-test overrides
+  // actually take effect — a prior version captured this as a top-level
+  // const from the env var, which meant it was fixed at first import and
+  // silently ignored later overrides within the same process.
+  cacheDir?: string;
 }
 
 // Returns cached HTML if present; otherwise fetches, rate-limits, and
 // caches. Never re-fetches a URL that's already on disk.
 export async function cachedFetch(
   url: string,
-  { namespace, minIntervalMs = 2000 }: CachedFetchOptions,
+  {
+    namespace,
+    minIntervalMs = 2000,
+    cacheDir = process.env.SCOUTREACH_CACHE_DIR ?? ".cache",
+  }: CachedFetchOptions,
 ): Promise<string> {
-  const cachePath = cachePathFor(namespace, url);
+  const cachePath = cachePathFor(cacheDir, namespace, url);
 
   try {
     return await readFile(cachePath, "utf-8");
