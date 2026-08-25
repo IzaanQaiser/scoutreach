@@ -95,21 +95,61 @@ real scraped companies, not fixtures.
 
 ## Phase 3 — Contacts, ranking, v0.1 export · v0.1 milestone
 
-**Builds:** Apollo People Search (`ContactProvider.search`, 0-credit), rank
-scoring (`rank.ts`, formula in file comment — implement as written), CSV
-export, `/app/companies` sortable table.
+**Builds:** Apollo People Search + Enrichment provider (`lib/providers/
+apollo-provider.ts`), contact fetch (`lib/pipeline/contacts.ts`, stage
+[5]), rank scoring (`lib/pipeline/rank.ts`, stage [6]), CSV export
+(`lib/pipeline/export.ts`), `/app/companies` sortable table.
+
+Verified directly against Apollo's published API schema (2026-08-25),
+not assumed from the spec: the free 0-credit search endpoint
+(`POST /mixed_people/api_search`) returns far less than a first read of
+spec §0.3 implies — only `id`/`first_name`/an **obfuscated** last name/
+`title`/`organization.name`. No seniority, department, linkedin, or
+tenure. Those only come from enrichment (`POST /people/match`, costs
+credits), which per spec's own ordering rule must run *after* ranking —
+so the rank formula's tenure term can't be computed at rank time at all.
+
+**Confirmed with user:** rank on title text alone (title_weight +
+title-derived department-keyword bonus + recruiter penalty), drop the
+tenure term entirely rather than spend enrichment credits on unranked
+candidates to recover it. `rank.ts` documents the full original formula
+and exactly what changed and why.
+
+Enrichment (stage [7]) is implemented in `apollo-provider.ts` and cached
+(a rerun must never re-spend credits) but is **not called from the
+pipeline yet** — still blocked on the Apollo credit-pool question from
+Phase 1 (§14). `contacts.ts` persists rows with `last`/`seniority`/
+`department`/`linkedin`/`tenureMonths`/`email` all null until that's
+resolved and enrichment is wired in for the selected set.
+
+Also extended `http-cache.ts` with `cachedJsonCall` (POST/JSON, alongside
+the existing GET/HTML `cachedFetch`) — a real second consumer, not
+speculative, and caching a paid enrichment call matters more than a free
+HTML fetch.
 
 **Tests**
+- unit: Apollo provider request shape (endpoint, `x-api-key` header,
+  body) and response mapping for both search and enrich, including a
+  cache-hit test asserting zero network calls (i.e. zero re-spent
+  credits) on a repeat enrich call
 - unit: rank formula against a fixed input→score table covering every
   `title_weight` tier and every modifier
 - unit: selection rule (≥1 budget-owner, ≤1 recruiter, no duplicate
-  titles) including the edge case where no budget-owner exists in the pool
-- integration: `contacts.company_id` FK integrity; CSV row count == selected
-  contact count
+  titles), including a constructed case where the natural top-N excludes
+  the only budget-owner and the swap-in logic has to recover it, and the
+  case where no budget-owner exists in the pool at all (degrades
+  gracefully, never throws)
+- unit: CSV export row count equals selected-contact count, escapes
+  commas/quotes correctly
+- component: companies table sorts every column (string, numeric,
+  null-handling) without throwing, toggles direction on repeat clicks
 
-**Pass criteria:** selection rule holds on 100% of a 10-company sample;
-table UI sorts without error. **v0.1 exit gate (spec §12):** run for real —
-115 companies, ~1,500 contacts fetched, ~300 selected, evidence populated.
+**Pass criteria:** selection rule holds in the constructed edge cases
+above; CSV/table pass criteria met (all implemented and green, 75/75
+tests project-wide). **v0.1 exit gate (spec §12)** — running this for
+real (115 companies, ~1,500 contacts, ~300 selected) is still blocked on
+the same two open items as Phase 1: which industries to target, and the
+Apollo credit-pool check.
 
 ---
 
