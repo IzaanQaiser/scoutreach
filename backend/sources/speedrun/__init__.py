@@ -6,6 +6,7 @@ from backend.sources.speedrun.exceptions import (
     SpeedrunResponseError,
     SpeedrunTimeoutError,
 )
+from backend.sources.speedrun.importer import import_speedrun
 from backend.sources.speedrun.types import (
     SpeedrunCompaniesPage,
     SpeedrunCompany,
@@ -35,4 +36,5 @@ __all__ = [
     "SpeedrunResponseError",
     "SpeedrunScope",
     "SpeedrunTimeoutError",
+    "import_speedrun",
 ]

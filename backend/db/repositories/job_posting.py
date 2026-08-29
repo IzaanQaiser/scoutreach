@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -88,3 +89,22 @@ def upsert_job_posting(
 
 def get_job_posting(session: Session, job_posting_id: int) -> JobPosting | None:
     return session.get(JobPosting, job_posting_id)
+
+
+def deactivate_missing_job_postings(
+    session: Session,
+    *,
+    company_id: int,
+    source: str,
+    live_external_ids: set[str],
+) -> None:
+    statement = update(JobPosting).where(
+        JobPosting.company_id == company_id,
+        JobPosting.source == source,
+        JobPosting.active.is_(True),
+    )
+    if live_external_ids:
+        statement = statement.where(
+            JobPosting.external_id.not_in(live_external_ids)
+        )
+    session.execute(statement.values(active=False))
