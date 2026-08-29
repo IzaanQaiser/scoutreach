@@ -38,6 +38,7 @@ def test_base_and_alembic_metadata_are_registered_and_shared() -> None:
         "companies",
         "contact_methods",
         "contacts",
+        "jobs",
         "job_postings",
         "outreach_drafts",
         "outreach_sends",
