@@ -34,7 +34,12 @@ def test_engine_and_session_factory_are_constructed_without_connecting(
 
 def test_base_and_alembic_metadata_are_registered_and_shared() -> None:
     assert target_metadata is Base.metadata
-    assert set(Base.metadata.tables) == {"companies", "job_postings"}
+    assert set(Base.metadata.tables) == {
+        "companies",
+        "contact_methods",
+        "contacts",
+        "job_postings",
+    }
 
 
 def test_database_configuration_errors_do_not_expose_credentials(monkeypatch) -> None:
