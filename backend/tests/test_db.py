@@ -32,9 +32,9 @@ def test_engine_and_session_factory_are_constructed_without_connecting(
     assert session_factory.kw["bind"] is engine
 
 
-def test_base_and_alembic_metadata_are_empty_and_shared() -> None:
+def test_base_and_alembic_metadata_are_registered_and_shared() -> None:
     assert target_metadata is Base.metadata
-    assert len(Base.metadata.tables) == 0
+    assert set(Base.metadata.tables) == {"companies", "job_postings"}
 
 
 def test_database_configuration_errors_do_not_expose_credentials(monkeypatch) -> None:
