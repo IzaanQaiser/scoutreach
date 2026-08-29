@@ -4,6 +4,8 @@ from backend.models import (
     Contact,
     ContactMethod,
     JobPosting,
+    OutreachDraft,
+    OutreachSend,
     ProfileArtifact,
     ProfileFact,
 )
@@ -16,6 +18,8 @@ __all__ = [
     "Contact",
     "ContactMethod",
     "JobPosting",
+    "OutreachDraft",
+    "OutreachSend",
     "ProfileArtifact",
     "ProfileFact",
     "target_metadata",
