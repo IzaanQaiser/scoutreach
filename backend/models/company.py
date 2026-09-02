@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Index, JSON, String, Text, func, text
+from sqlalchemy import DateTime, ForeignKey, Index, JSON, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base
@@ -10,6 +10,7 @@ class Company(Base):
     __tablename__ = "companies"
     __table_args__ = (
         Index("ix_companies_domain", "domain"),
+        Index("ix_companies_canonical_company_id", "canonical_company_id"),
         Index("ix_companies_normalized_name", "normalized_name"),
         Index(
             "ux_companies_source_external_id",
@@ -21,6 +22,9 @@ class Company(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    canonical_company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id"),
+    )
     name: Mapped[str] = mapped_column(String, nullable=False)
     normalized_name: Mapped[str] = mapped_column(String, nullable=False)
     source: Mapped[str] = mapped_column(String, nullable=False)
